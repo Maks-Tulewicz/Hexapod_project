@@ -1,0 +1,9 @@
+<launch>
+
+<rosparam file="$(find hex_final_urdf_description)/launch/controller.yaml" command="load"/>
+<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" args="hip_joint_1_position_controller hip_joint_3_position_controller hip_joint_5_position_controller hip_joint_2_position_controller hip_joint_4_position_controller hip_joint_6_position_controller knee_joint_1_position_controller knee_joint_3_position_controller knee_joint_5_position_controller knee_joint_2_position_controller knee_joint_4_position_controller knee_joint_6_position_controller ankle_joint_1_position_controller ankle_joint_3_position_controller ankle_joint_5_position_controller ankle_joint_2_position_controller ankle_joint_4_position_controller ankle_joint_6_position_controller joint_state_controller "/>
+<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
+  <remap from="/joint_states" to="/hex_final_urdf/joint_states"/>
+</node>
+
+</launch>

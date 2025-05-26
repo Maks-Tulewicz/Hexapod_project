@@ -1,0 +1,29 @@
+<launch>
+  <!-- 1. Uruchom Gazebo z naszym światem -->
+  <arg name="paused" default="false"/>
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find hex_final_urdf_description)/worlds/hex_test.world"/>
+    <arg name="paused"     value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <!-- 2. Publikacja URDF → /robot_description -->
+  <param name="robot_description" command="$(find xacro)/xacro $(find hex_final_urdf_description)/urdf/hex_final_urdf.xacro" />
+
+  <!-- 3. Spawn modelu (2 cm nad ziemią) -->
+  <node name="spawn_hex" pkg="gazebo_ros" type="spawn_model"
+        args="-urdf -model hex_final -param robot_description -z 0.02"/>
+
+  <!-- 4. Spawner kontrolerów -->
+  <rosparam command="load" file="$(find hex_final_urdf_description)/launch/controller.yaml" />
+
+  <node name="controller_spawner" pkg="controller_manager" type="spawner"
+        args="joint_state_controller
+              hip_joint_1_position_controller hip_joint_2_position_controller hip_joint_3_position_controller
+              hip_joint_4_position_controller hip_joint_5_position_controller hip_joint_6_position_controller
+              knee_joint_1_position_controller knee_joint_2_position_controller knee_joint_3_position_controller
+              knee_joint_4_position_controller knee_joint_5_position_controller knee_joint_6_position_controller
+              ankle_joint_1_position_controller ankle_joint_2_position_controller ankle_joint_3_position_controller
+              ankle_joint_4_position_controller ankle_joint_5_position_controller ankle_joint_6_position_controller"
+        output="screen"/>
+</launch>

@@ -1,0 +1,15 @@
+/***********************************************************************
+ *  local_leg_gait.cpp – każda noga liczy IK w swoim *lokalnym* układzie
+ *
+ *  ► Układ lokalny nogi (hip frame)
+ *      +X  →  przód robota  (global +Y)
+ *      +Z  →  w górę        (global +Z)
+ *      (płaszczyzna X‑Z jest więc płaszczyzną „chodu” dla danej nogi)
+ *
+ *  ► Hip‑yaw (q1) – stały kąt wstępny, zależny od numeru nogi.
+ *    (dla narożnych nóg ±45°, dla środkowych 0°)
+ *
+ *  ► IK 2‑D na segmentach L2 i L3.
+ *      q2 – kolano, q3 – kostka (z zachowaniem zwrotów osi z URDF).
+ *
+ ***********************************************************************/

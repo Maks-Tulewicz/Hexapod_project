@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Automatyczne ustawienie pozycji początkowej w Gazebo -->
+  <xacro:macro name="set_initial_position" params="name value">
+    <gazebo>
+      <plugin name="${name}_position_controller" filename="libgazebo_ros_joint_position_controller.so">
+        <joint_name>${name}</joint_name>
+        <pid>100.0 0.01 10.0</pid>
+        <initial_position>${value}</initial_position>
+      </plugin>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Pozycje początkowe dla wszystkich stawów -->
+  <xacro:set_initial_position name="hip_joint_1" value="0.7854"/>      <!-- 45° -->
+  <xacro:set_initial_position name="hip_joint_2" value="-0.7854"/>     <!-- -45° -->
+  <xacro:set_initial_position name="hip_joint_3" value="0.0"/>
+  <xacro:set_initial_position name="hip_joint_4" value="0.0"/>
+  <xacro:set_initial_position name="hip_joint_5" value="0.7854"/>      <!-- 45° -->
+  <xacro:set_initial_position name="hip_joint_6" value="-0.7854"/>     <!-- -45° -->
+
+  <xacro:set_initial_position name="knee_joint_1" value="-0.5236"/>    <!-- -30° -->
+  <xacro:set_initial_position name="knee_joint_2" value="-0.5236"/>
+  <xacro:set_initial_position name="knee_joint_3" value="-0.5236"/>
+  <xacro:set_initial_position name="knee_joint_4" value="-0.5236"/>
+  <xacro:set_initial_position name="knee_joint_5" value="-0.5236"/>
+  <xacro:set_initial_position name="knee_joint_6" value="-0.5236"/>
+
+  <xacro:set_initial_position name="ankle_joint_1" value="-2.0944"/>   <!-- -120° -->
+  <xacro:set_initial_position name="ankle_joint_2" value="-2.0944"/>
+  <xacro:set_initial_position name="ankle_joint_3" value="-2.0944"/>
+  <xacro:set_initial_position name="ankle_joint_4" value="-2.0944"/>
+  <xacro:set_initial_position name="ankle_joint_5" value="-2.0944"/>
+  <xacro:set_initial_position name="ankle_joint_6" value="-2.0944"/>
+
+</robot>

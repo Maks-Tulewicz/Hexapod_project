@@ -1,0 +1,553 @@
+<?xml version="1.0" ?>
+<robot name="hex_final_urdf" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find hex_final_urdf_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find hex_final_urdf_description)/urdf/hex_final_urdf.trans" />
+<xacro:include filename="$(find hex_final_urdf_description)/urdf/hex_final_urdf.gazebo" />
+
+
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.008825975080218545 -0.0006417253665135361 0.009163636393538644" rpy="0 0 0"/>
+    <mass value="4.696322130210778"/>
+    <inertia ixx="0.016504" iyy="0.024691" izz="0.036814" ixy="-4e-06" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_1_1">
+  <inertial>
+    <origin xyz="-0.03206068846643359 -0.0005590825770585561 -0.028059834297053474" rpy="0 0 0"/>
+    <mass value="0.02676157449504787"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.068956 -0.077136 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.068956 -0.077136 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_3_1">
+  <inertial>
+    <origin xyz="-0.032060942535913226 -0.0005598285075788824 -0.028059834297053502" rpy="0 0 0"/>
+    <mass value="0.02676157449504787"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.101174 0.000645 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.101174 0.000645 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_5_1">
+  <inertial>
+    <origin xyz="-0.03206068846643352 -0.0005595744380991335 -0.02805983429705346" rpy="0 0 0"/>
+    <mass value="0.02676157449504787"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.068956 0.078427 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.068956 0.078427 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_2_1">
+  <inertial>
+    <origin xyz="0.032060405545851225 0.0005595915681265995 -0.02805983429705361" rpy="0 0 0"/>
+    <mass value="0.026761574495047884"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.086608 -0.077136 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.086608 -0.077136 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_4_1">
+  <inertial>
+    <origin xyz="0.032060659615331014 0.0005588456376063277 -0.02805983429705355" rpy="0 0 0"/>
+    <mass value="0.026761574495047884"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.118826 0.000645 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.118826 0.000645 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="hip_link_6_1">
+  <inertial>
+    <origin xyz="0.032060405545851295 0.000559099707086036 -0.02805983429705349" rpy="0 0 0"/>
+    <mass value="0.026761574495047884"/>
+    <inertia ixx="1.5e-05" iyy="1.7e-05" izz="1.6e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.086608 0.078427 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.086608 0.078427 -0.021885" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/hip_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_1_1">
+  <inertial>
+    <origin xyz="-0.05264062317283599 -0.033571274079311056 -1.9542260402799147e-05" rpy="0 0 0"/>
+    <mass value="0.11346511278470423"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.126956 -0.104636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.126956 -0.104636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_3_1">
+  <inertial>
+    <origin xyz="-0.05264087724231564 -0.03357202000983138 -1.9542260402826035e-05" rpy="0 0 0"/>
+    <mass value="0.11346511278470423"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.159174 -0.026855 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.159174 -0.026855 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_5_1">
+  <inertial>
+    <origin xyz="-0.052640623172835965 -0.033571765940351606 -1.9542260402783534e-05" rpy="0 0 0"/>
+    <mass value="0.11346511278470423"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.126956 0.050927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.126956 0.050927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_2_1">
+  <inertial>
+    <origin xyz="0.05263886798255954 0.03357178275317327 1.8547903258242342e-05" rpy="0 0 0"/>
+    <mass value="0.11346511468823228"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.144608 -0.049636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.144608 -0.049636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_4_1">
+  <inertial>
+    <origin xyz="0.05263912205203933 0.03357103682265299 1.8547903258304792e-05" rpy="0 0 0"/>
+    <mass value="0.11346511468823228"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.176826 0.028145 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.176826 0.028145 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="thigh_link_6_1">
+  <inertial>
+    <origin xyz="0.052638867982559595 0.03357129089213268 1.854790325838459e-05" rpy="0 0 0"/>
+    <mass value="0.11346511468823228"/>
+    <inertia ixx="2.8e-05" iyy="0.0002" izz="0.000213" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.144608 0.105927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.144608 0.105927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/thigh_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_1_1">
+  <inertial>
+    <origin xyz="-0.06567923673204151 -0.02667853756935462 0.010343853082014309" rpy="0 0 0"/>
+    <mass value="0.28364788051397943"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="-1e-06" ixz="5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.232236 -0.104636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.232236 -0.104636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_3_1">
+  <inertial>
+    <origin xyz="-0.06567949080152108 -0.026679283499874935 0.01034385308201428" rpy="0 0 0"/>
+    <mass value="0.28364788051397943"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="-1e-06" ixz="5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.264454 -0.026855 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.264454 -0.026855 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_5_1">
+  <inertial>
+    <origin xyz="-0.06567923673204129 -0.026679029430395157 0.010343853082014326" rpy="0 0 0"/>
+    <mass value="0.28364788051397943"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="-1e-06" ixz="5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.232236 0.050927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.232236 0.050927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_5_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_2_1">
+  <inertial>
+    <origin xyz="0.06567895381145672 0.0266790465604224 0.010343853082014326" rpy="0 0 0"/>
+    <mass value="0.28364788051397866"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="1e-06" ixz="-5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.249888 -0.049636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.249888 -0.049636 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_4_1">
+  <inertial>
+    <origin xyz="0.06567920788093651 0.026678300629902132 0.010343853082014388" rpy="0 0 0"/>
+    <mass value="0.28364788051397866"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="1e-06" ixz="-5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.282106 0.028145 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.282106 0.028145 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="shin_link_6_1">
+  <inertial>
+    <origin xyz="0.06567895381145672 0.02667855469938181 0.01034385308201451" rpy="0 0 0"/>
+    <mass value="0.28364788051397866"/>
+    <inertia ixx="0.000125" iyy="0.000706" izz="0.000765" ixy="6e-06" iyz="1e-06" ixz="-5.2e-05"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.249888 0.105927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.249888 0.105927 0.005615" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://hex_final_urdf_description/meshes/shin_link_6_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="hip_joint_1" type="revolute">
+  <origin xyz="-0.068956 0.077136 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_1_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="0.261799" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="hip_joint_3" type="revolute">
+  <origin xyz="-0.101174 -0.000645 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_3_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="1.047198" lower="-1.047198" effort="100" velocity="100"/>
+</joint>
+
+<joint name="hip_joint_5" type="revolute">
+  <origin xyz="-0.068956 -0.078427 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_5_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="1.570796" lower="-0.261799" effort="100" velocity="100"/>
+</joint>
+
+<joint name="hip_joint_2" type="revolute">
+  <origin xyz="0.086608 0.077136 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_2_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="1.570796" lower="-0.261799" effort="100" velocity="100"/>
+</joint>
+
+<joint name="hip_joint_4" type="revolute">
+  <origin xyz="0.118826 -0.000645 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_4_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="1.047198" lower="-1.047198" effort="100" velocity="100"/>
+</joint>
+
+<joint name="hip_joint_6" type="revolute">
+  <origin xyz="0.086608 -0.078427 0.021885" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="hip_link_6_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="0.261799" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_1" type="revolute">
+  <origin xyz="-0.058 0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_1_1"/>
+  <child link="thigh_link_1_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_3" type="revolute">
+  <origin xyz="-0.058 0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_3_1"/>
+  <child link="thigh_link_3_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_5" type="revolute">
+  <origin xyz="-0.058 0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_5_1"/>
+  <child link="thigh_link_5_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_2" type="revolute">
+  <origin xyz="0.058 -0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_2_1"/>
+  <child link="thigh_link_2_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_4" type="revolute">
+  <origin xyz="0.058 -0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_4_1"/>
+  <child link="thigh_link_4_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+
+<joint name="knee_joint_6" type="revolute">
+  <origin xyz="0.058 -0.0275 -0.0275" rpy="0 0 0"/>
+  <parent link="hip_link_6_1"/>
+  <child link="thigh_link_6_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="1.570796" lower="-1.570796" effort="100" velocity="100"/>
+</joint>
+<joint name="ankle_joint_1" type="revolute">
+  <origin xyz="-0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_1_1"/>
+  <child link="shin_link_1_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="ankle_joint_3" type="revolute">
+  <origin xyz="-0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_3_1"/>
+  <child link="shin_link_3_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="ankle_joint_5" type="revolute">
+  <origin xyz="-0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_5_1"/>
+  <child link="shin_link_5_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="ankle_joint_2" type="revolute">
+  <origin xyz="0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_2_1"/>
+  <child link="shin_link_2_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="ankle_joint_4" type="revolute">
+  <origin xyz="0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_4_1"/>
+  <child link="shin_link_4_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="ankle_joint_6" type="revolute">
+  <origin xyz="0.10528 0.0 0.0" rpy="0 0 0"/>
+  <parent link="thigh_link_6_1"/>
+  <child link="shin_link_6_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="0.785398" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+
+
+</robot>
