@@ -1,53 +1,68 @@
 #include <ros/ros.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Empty.h>
+#include <geometry_msgs/Twist.h>
+#include <memory>
+#include "hex_controller/gait_controller.hpp"
 #include "hex_controller/tripod_gait.hpp"
 #include "hex_controller/bipod_gait.hpp"
-#include "hex_controller/tripod_gait.hpp"
 
 class HexapodController
 {
+private:
     ros::NodeHandle nh_;
-    ros::Subscriber gait_cmd_sub_;
-    ros::Subscriber vel_cmd_sub_;
+    std::unique_ptr<hex_controller::GaitController> gait_controller_;
 
-    std::unique_ptr<hex_controller::GaitController> current_gait_;
+    ros::Subscriber cmd_vel_sub_;
+    ros::Subscriber gait_command_sub_;
+    ros::Subscriber stand_command_sub_;
+
+public:
+    HexapodController() : nh_("~")
+    {
+        // Domyślnie zaczynamy z chodem trójnożnym
+        gait_controller_ = std::make_unique<hex_controller::TripodGait>(nh_);
+
+        // Subskrybuj tematy
+        cmd_vel_sub_ = nh_.subscribe("/hex/cmd_vel", 1,
+                                     &HexapodController::cmdVelCallback, this);
+        gait_command_sub_ = nh_.subscribe("/hex/gait_command", 1,
+                                          &HexapodController::gaitCommandCallback, this);
+        stand_command_sub_ = nh_.subscribe("/hex/stand_command", 1,
+                                           &HexapodController::standCommandCallback, this);
+
+        ROS_INFO("Hexapod controller initialized");
+    }
+
+    void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
+    {
+        if (gait_controller_)
+        {
+            gait_controller_->step(*msg);
+        }
+    }
 
     void gaitCommandCallback(const std_msgs::String::ConstPtr &msg)
     {
         if (msg->data == "tripod")
         {
-            current_gait_ = std::make_unique<hex_controller::TripodGait>(nh_);
+            gait_controller_ = std::make_unique<hex_controller::TripodGait>(nh_);
+            ROS_INFO("Switched to tripod gait");
         }
         else if (msg->data == "bipod")
         {
-            current_gait_ = std::make_unique<hex_controller::BipodGait>(nh_);
-        }
-        else if (msg->data == "tripod")
-        {
-            current_gait_ = std::make_unique<hex_controller::TripodGait>(nh_);
-        }
-
-        if (current_gait_)
-        {
-            current_gait_->standUp();
+            gait_controller_ = std::make_unique<hex_controller::BipodGait>(nh_);
+            ROS_INFO("Switched to bipod gait");
         }
     }
 
-    void velocityCommandCallback(const geometry_msgs::Twist::ConstPtr &msg)
+    void standCommandCallback(const std_msgs::Empty::ConstPtr &msg)
     {
-        if (current_gait_)
+        if (gait_controller_)
         {
-            current_gait_->step(*msg);
+            gait_controller_->standUp();
+            ROS_INFO("Standing up");
         }
-    }
-
-public:
-    HexapodController()
-    {
-        gait_cmd_sub_ = nh_.subscribe("gait_command", 1,
-                                      &HexapodController::gaitCommandCallback, this);
-        vel_cmd_sub_ = nh_.subscribe("cmd_vel", 1,
-                                     &HexapodController::velocityCommandCallback, this);
     }
 };
 
