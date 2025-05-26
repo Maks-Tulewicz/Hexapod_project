@@ -171,40 +171,54 @@ void setLegJoints(std::map<std::string, JointPublisher> &pubs,
 //---------------------------------------------------------------------
 void stand_up_ik(std::map<std::string, JointPublisher> &pubs)
 {
-    const double height = -24.0;
-    const double STEPS = 150; // Zwiększona liczba kroków dla płynności
-    const double dt = 0.05;   // Wolniejszy ruch
+    const double final_height = -24.0;
+    const double start_height = -15.0; // Start from a higher position
+    const double STEPS = 200;          // More steps for smoother motion
+    const double dt = 0.05;
 
-    // Pozycje docelowe dla każdej nogi - rozszerzone pozycje dla lepszej stabilności
+    // Wider stance positions for better stability
     const std::map<int, std::vector<double>> target_positions = {
-        {1, {14.0, -12.0, height}},  // lewa przednia - bardziej na zewnątrz
-        {2, {-14.0, -12.0, height}}, // prawa przednia - bardziej na zewnątrz
-        {3, {17.0, 0.0, height}},    // lewa środkowa
-        {4, {-17.0, 0.0, height}},   // prawa środkowa
-        {5, {14.0, 12.0, height}},   // lewa tylna - bardziej na zewnątrz
-        {6, {-14.0, 12.0, height}}   // prawa tylna - bardziej na zewnątrz
+        {1, {18.0, -15.0, final_height}},  // lewa przednia - bardziej na zewnątrz
+        {2, {-18.0, -15.0, final_height}}, // prawa przednia - bardziej na zewnątrz
+        {3, {22.0, 0.0, final_height}},    // lewa środkowa - jeszcze bardziej na zewnątrz
+        {4, {-22.0, 0.0, final_height}},   // prawa środkowa - jeszcze bardziej na zewnątrz
+        {5, {18.0, 15.0, final_height}},   // lewa tylna - bardziej na zewnątrz
+        {6, {-18.0, 15.0, final_height}}   // prawa tylna - bardziej na zewnątrz
     };
 
-    // Zacznij od wyższej pozycji początkowej
-    const double start_height = -12.0; // Zwiększona wysokość początkowa
-
-    // Interpolacja z funkcją wygładzającą
-    for (int step = 1; step <= STEPS && ros::ok(); ++step)
+    // First phase: spread legs wider
+    for (int step = 0; step <= STEPS / 2; ++step)
     {
-        // Wygładzona interpolacja zamiast liniowej
-        double ratio = (1 - std::cos(M_PI * step / STEPS)) / 2.0;
+        double phase = static_cast<double>(step) / (STEPS / 2);
 
-        for (int leg = 1; leg <= 6; ++leg)
+        for (const auto &[leg, target] : target_positions)
         {
-            const auto &target = target_positions.at(leg);
-            double z_current = start_height + ratio * (target[2] - start_height);
-
-            // Dodaj stopniowe rozszerzanie nóg
-            double x = target[0];
-            double y = target[1] * ratio; // Stopniowo rozszerzaj nogi na boki
+            // Start from current position and move outward
+            double x = target[0] * phase;
+            double y = target[1] * phase;
+            double z = start_height; // Keep higher initially
 
             double q1, q2, q3;
-            if (computeLegIK(leg, x, y, z_current, q1, q2, q3))
+            if (computeLegIK(leg, x, y, z, q1, q2, q3))
+            {
+                setLegJoints(pubs, leg, q1, q2, q3);
+            }
+        }
+        ros::Duration(dt).sleep();
+    }
+
+    ros::Duration(1.0).sleep(); // Pause for stability
+
+    // Second phase: lower the body
+    for (int step = 0; step <= STEPS / 2; ++step)
+    {
+        double phase = static_cast<double>(step) / (STEPS / 2);
+        double current_height = start_height + (final_height - start_height) * phase;
+
+        for (const auto &[leg, target] : target_positions)
+        {
+            double q1, q2, q3;
+            if (computeLegIK(leg, target[0], target[1], current_height, q1, q2, q3))
             {
                 setLegJoints(pubs, leg, q1, q2, q3);
             }
@@ -213,7 +227,7 @@ void stand_up_ik(std::map<std::string, JointPublisher> &pubs)
     }
 
     ros::Duration(2.0).sleep();
-    ROS_INFO("Robot wstał.");
+    ROS_INFO("Robot wstał stabilnie.");
 }
 //---------------------------------------------------------------------
 //  Cykl ruchu dla wszystkich nóg z kinematyką odwrotną
@@ -366,7 +380,7 @@ void walkForward(std::map<std::string, JointPublisher> &pubs,
                  int num_steps)
 {
     WalkingParameters params{
-        .step_length = 5.0, // Zmniejszona długość kroku
+        .step_length = 6.0, // Zmniejszona długość kroku
         .step_height = 4.0, // Zmniejszona wysokość podnoszenia
         .cycle_time = 1.8,
         .body_shift = 2.0,
@@ -379,27 +393,264 @@ void walkForward(std::map<std::string, JointPublisher> &pubs,
         ros::Duration(0.2).sleep(); // Pauza między krokami
     }
 }
+// Dodaj nową funkcję do równoczesnego ruchu pary nóg
+void moveLegPair(std::map<std::string, JointPublisher> &pubs,
+                 int leg1, int leg2,
+                 const LegPosition &start_pos1,
+                 const LegPosition &start_pos2,
+                 const WalkingParameters &params)
+{
+    const int STEPS = 60;
+    const double dt = 0.005;
+
+    for (int step = 0; step <= STEPS; ++step)
+    {
+        double phase = static_cast<double>(step) / STEPS;
+
+        // Obliczenia dla pierwszej nogi
+        double x1 = start_pos1.x;
+        double y1 = start_pos1.y;
+        double z1 = start_pos1.z;
+
+        // Obliczenia dla drugiej nogi
+        double x2 = start_pos2.x;
+        double y2 = start_pos2.y;
+        double z2 = start_pos2.z;
+
+        if (phase <= 0.5)
+        {
+            // Faza przenoszenia - obie nogi w powietrzu
+            double swing_phase = phase * 2.0;
+
+            // Pierwsza noga
+            y1 = start_pos1.y - params.step_length * (1.0 - std::cos(M_PI * swing_phase));
+            z1 = start_pos1.z - params.step_height * std::sin(M_PI * swing_phase);
+
+            // Druga noga - ten sam ruch
+            y2 = start_pos2.y - params.step_length * (1.0 - std::cos(M_PI * swing_phase));
+            z2 = start_pos2.z - params.step_height * std::sin(M_PI * swing_phase);
+        }
+        else
+        {
+            // Faza podporowa - obie nogi wracają
+            double support_phase = (phase - 0.5) * 2.0;
+
+            // Pierwsza noga
+            y1 = (start_pos1.y - params.step_length) + params.step_length * support_phase;
+
+            // Druga noga
+            y2 = (start_pos2.y - params.step_length) + params.step_length * support_phase;
+        }
+
+        // Zastosuj kinematykę odwrotną i wyślij komendy dla obu nóg jednocześnie
+        double q1_1, q2_1, q3_1, q1_2, q2_2, q3_2;
+
+        if (computeLegIK(leg1, x1, y1, z1, q1_1, q2_1, q3_1))
+        {
+            setLegJoints(pubs, leg1, q1_1, q2_1, q3_1);
+        }
+
+        if (computeLegIK(leg2, x2, y2, z2, q1_2, q2_2, q3_2))
+        {
+            setLegJoints(pubs, leg2, q1_2, q2_2, q3_2);
+        }
+
+        ros::Duration(dt).sleep();
+    }
+}
+
+// Zmodyfikowana funkcja chodu dwunożnego
+void walkForwardTwoLegs(std::map<std::string, JointPublisher> &pubs,
+                        const std::map<int, std::vector<double>> &base_positions,
+                        int num_steps)
+{
+    WalkingParameters params{
+        .step_length = 6.0,      // Mniejsza długość kroku dla stabilności
+        .step_height = 3.0,      // Mniejsza wysokość podnoszenia
+        .cycle_time = 2.0,       // Wolniejszy cykl
+        .body_shift = 1.5,       // Mniejsze przesunięcie ciała
+        .standing_height = -24.0 // Standardowa wysokość
+    };
+
+    // Pary nóg do równoczesnego ruchu
+    const std::vector<std::pair<int, int>> leg_pairs = {
+        {1, 6}, // Lewa przednia i prawa tylna
+        {2, 5}, // Prawa przednia i lewa tylna
+        {3, 4}  // Lewa środkowa i prawa środkowa
+    };
+
+    for (int step = 0; step < num_steps && ros::ok(); ++step)
+    {
+        ROS_INFO("Wykonuję krok dwunożny %d z %d", step + 1, num_steps);
+
+        // Wykonaj ruch dla każdej pary nóg
+        for (const auto &pair : leg_pairs)
+        {
+            ROS_INFO("Przenoszenie pary nóg %d i %d", pair.first, pair.second);
+
+            // Przygotuj pozycje początkowe dla obu nóg
+            const auto &base1 = base_positions.at(pair.first);
+            const auto &base2 = base_positions.at(pair.second);
+
+            LegPosition start_pos1 = {base1[0], base1[1], base1[2]};
+            LegPosition start_pos2 = {base2[0], base2[1], base2[2]};
+
+            // Przenieś parę nóg jednocześnie
+            moveLegPair(pubs, pair.first, pair.second, start_pos1, start_pos2, params);
+
+            // Krótka pauza między parami dla stabilności
+            ros::Duration(0.3).sleep();
+        }
+
+        // Pauza między pełnymi cyklami
+        ros::Duration(0.5).sleep();
+    }
+}
+
+// Funkcja do równoczesnego ruchu trzech nóg
+void moveThreeLegs(std::map<std::string, JointPublisher> &pubs,
+                   int leg1, int leg2, int leg3,
+                   const LegPosition &start_pos1,
+                   const LegPosition &start_pos2,
+                   const LegPosition &start_pos3,
+                   const WalkingParameters &params)
+{
+    const int STEPS = 60;
+    const double dt = 0.005;
+
+    for (int step = 0; step <= STEPS; ++step)
+    {
+        double phase = static_cast<double>(step) / STEPS;
+
+        // Pozycje dla wszystkich trzech nóg
+        std::vector<double> x = {start_pos1.x, start_pos2.x, start_pos3.x};
+        std::vector<double> y = {start_pos1.y, start_pos2.y, start_pos3.y};
+        std::vector<double> z = {start_pos1.z, start_pos2.z, start_pos3.z};
+        std::vector<int> legs = {leg1, leg2, leg3};
+
+        if (phase <= 0.5)
+        {
+            // Faza przenoszenia - wszystkie trzy nogi w powietrzu
+            double swing_phase = phase * 2.0;
+
+            for (int i = 0; i < 3; ++i)
+            {
+                y[i] = y[i] - params.step_length * (1.0 - std::cos(M_PI * swing_phase));
+                z[i] = z[i] - params.step_height * std::sin(M_PI * swing_phase);
+            }
+        }
+        else
+        {
+            // Faza podporowa - wszystkie nogi wracają
+            double support_phase = (phase - 0.5) * 2.0;
+
+            for (int i = 0; i < 3; ++i)
+            {
+                y[i] = (y[i] - params.step_length) + params.step_length * support_phase;
+            }
+        }
+
+        // Aplikuj kinematykę odwrotną i wysyłaj komendy dla wszystkich nóg
+        for (int i = 0; i < 3; ++i)
+        {
+            double q1, q2, q3;
+            if (computeLegIK(legs[i], x[i], y[i], z[i], q1, q2, q3))
+            {
+                setLegJoints(pubs, legs[i], q1, q2, q3);
+            }
+        }
+
+        ros::Duration(dt).sleep();
+    }
+}
+
+// Funkcja implementująca chód trójnożny
+void walkForwardThreeLegs(std::map<std::string, JointPublisher> &pubs,
+                          const std::map<int, std::vector<double>> &base_positions,
+                          int num_steps)
+{
+    WalkingParameters params{
+        .step_length = 4.5,      // Mniejsza długość kroku dla większej stabilności
+        .step_height = 2.5,      // Mniejsza wysokość podnoszenia
+        .cycle_time = 2.0,       // Wolniejszy cykl
+        .body_shift = 1.0,       // Mniejsze przesunięcie ciała
+        .standing_height = -24.0 // Standardowa wysokość
+    };
+
+    // Dwie grupy po trzy nogi
+    const std::vector<std::vector<int>> leg_groups = {
+        {1, 4, 5}, // Grupa 1: lewa przednia, prawa środkowa, lewa tylna
+        {2, 3, 6}  // Grupa 2: prawa przednia, lewa środkowa, prawa tylna
+    };
+
+    for (int step = 0; step < num_steps && ros::ok(); ++step)
+    {
+        ROS_INFO("Wykonuję krok trójnożny %d z %d", step + 1, num_steps);
+
+        // Wykonaj ruch dla każdej grupy nóg
+        for (const auto &group : leg_groups)
+        {
+            ROS_INFO("Przenoszenie grupy nóg %d, %d i %d", group[0], group[1], group[2]);
+
+            // Przygotuj pozycje początkowe dla wszystkich nóg w grupie
+            std::vector<LegPosition> start_positions;
+            for (int leg : group)
+            {
+                const auto &base = base_positions.at(leg);
+                start_positions.push_back({base[0], base[1], base[2]});
+            }
+
+            // Przenieś trzy nogi jednocześnie
+            moveThreeLegs(pubs, group[0], group[1], group[2],
+                          start_positions[0], start_positions[1], start_positions[2],
+                          params);
+
+            // Krótka pauza między grupami dla stabilności
+            ros::Duration(0.4).sleep();
+        }
+
+        // Pauza między pełnymi cyklami
+        ros::Duration(0.6).sleep();
+    }
+}
+
+// Zmodyfikowany main do demonstracji wszystkich trybów chodu
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "hexapod_kinematics_node");
+    ros::init(argc, argv, "hexapod_gait_demo_node");
     ros::NodeHandle nh;
 
     std::map<std::string, JointPublisher> pubs = init_publishers(nh);
 
-    // Pozycje bazowe dla nóg - lekko zmodyfikowane dla lepszej stabilności
+    // Pozycje bazowe dla nóg
     const std::map<int, std::vector<double>> base_positions = {
-        {1, {14.0, -12.0, -24.0}},  // lewa przednia
-        {2, {-14.0, -12.0, -24.0}}, // prawa przednia
-        {3, {17.0, 0.0, -24.0}},    // lewa środkowa
-        {4, {-17.0, 0.0, -24.0}},   // prawa środkowa
-        {5, {14.0, 12.0, -24.0}},   // lewa tylna
-        {6, {-14.0, 12.0, -24.0}}   // prawa tylna
+        {1, {18.0, -15.0, -24.0}},  // lewa przednia
+        {2, {-18.0, -15.0, -24.0}}, // prawa przednia
+        {3, {22.0, 0.0, -24.0}},    // lewa środkowa
+        {4, {-22.0, 0.0, -24.0}},   // prawa środkowa
+        {5, {18.0, 15.0, -24.0}},   // lewa tylna
+        {6, {-18.0, 15.0, -24.0}}   // prawa tylna
     };
 
+    // 1. Najpierw wstań
+    ROS_INFO("Rozpoczynam sekwencję wstawania...");
     stand_up_ik(pubs);
-    ros::Duration(2.0).sleep(); // Dłuższa pauza na stabilizację
+    ros::Duration(2.0).sleep();
 
-    walkForward(pubs, base_positions, 5);
+    // 2. Normalny chód
+    ROS_INFO("\n=== Demonstracja normalnego chodu ===");
+    walkForward(pubs, base_positions, 3);
+    ros::Duration(2.0).sleep();
 
+    // 3. Chód dwunożny
+    ROS_INFO("\n=== Demonstracja chodu dwunożnego ===");
+    walkForwardTwoLegs(pubs, base_positions, 3);
+    ros::Duration(2.0).sleep();
+
+    // 4. Chód trójnożny
+    ROS_INFO("\n=== Demonstracja chodu trójnożnego ===");
+    walkForwardThreeLegs(pubs, base_positions, 3);
+
+    ROS_INFO("Demonstracja zakończona.");
     return 0;
 }

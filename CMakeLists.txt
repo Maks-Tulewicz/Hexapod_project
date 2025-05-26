@@ -155,9 +155,14 @@ include_directories(
 ## --- C++ nody ---
 add_executable(stand_up_node         src/stand_up.cpp)
 add_executable(walk_two_leg_gait_node src/walk_two_leg_gait.cpp)
+add_executable(two_leg_walk_gait_node src/two_leg_walk_gait_node.cpp)
+
+
 
 target_link_libraries(stand_up_node          ${catkin_LIBRARIES})
 target_link_libraries(walk_two_leg_gait_node ${catkin_LIBRARIES})
+target_link_libraries(two_leg_walk_gait_node ${catkin_LIBRARIES})
+
 
 #############
 ## Install ##
