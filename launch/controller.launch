@@ -6,4 +6,10 @@
   <remap from="/joint_states" to="/hex_final_urdf/joint_states"/>
 </node>
 
+  <!-- Start the hexapod controller -->
+    <node name="hexapod_controller" pkg="hex_final_urdf_description" type="hexapod_controller_node" output="screen">
+        <param name="standing_height" value="0.15" />
+        <param name="step_height" value="0.05" />
+        <param name="cycle_time" value="1.0" />
+    </node>
 </launch>

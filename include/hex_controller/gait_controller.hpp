@@ -3,25 +3,29 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
+#include <std_msgs/Float64.h>
+#include <map>
+#include <string>
+#include <vector>
 
 namespace hex_controller
 {
 
     struct GaitParameters
     {
-        double standing_height;
-        double step_height;
-        double cycle_time;
-        double leg_x_offset;
-        double leg_y_offset;
+        double standing_height; // wysokość stania
+        double step_height;     // wysokość kroku
+        double cycle_time;      // czas cyklu
+        double leg_x_offset;    // przesunięcie nogi w osi X
+        double leg_y_offset;    // przesunięcie nogi w osi Y
     };
 
     class GaitController
     {
     protected:
         ros::NodeHandle &nh_;
+        std::map<std::string, ros::Publisher> joint_publishers_;
         GaitParameters params_;
-        std::vector<ros::Publisher> leg_publishers_;
 
     public:
         explicit GaitController(ros::NodeHandle &nh);
@@ -31,13 +35,13 @@ namespace hex_controller
         virtual void standUp();
 
     protected:
-        bool computeLegIK(int leg_id, double x, double y, double z,
-                          double &q1, double &q2, double &q3);
-        void setLegJoints(int leg_id, double q1, double q2, double q3);
-        void adjustLegPosition(double &x, double &y,
-                               const geometry_msgs::Twist &cmd_vel);
         void initializePublishers();
         void loadParameters();
+        bool computeLegIK(int leg_id, double x, double y, double z,
+                          double &hip, double &knee, double &ankle);
+        void setLegJoints(int leg_id, double hip, double knee, double ankle);
+        void adjustLegPosition(double &x, double &y,
+                               const geometry_msgs::Twist &cmd_vel);
     };
 
 } // namespace hex_controller

@@ -1,5 +1,6 @@
+#include <ros/ros.h>
+#include <std_msgs/Float64.h>
 #include "hex_controller/gait_controller.hpp"
-#include <sensor_msgs/JointState.h>
 #include <cmath>
 
 namespace hex_controller
@@ -13,28 +14,33 @@ namespace hex_controller
 
     void GaitController::loadParameters()
     {
-        // Wczytaj parametry z serwera parametrów ROS
-        params_.standing_height = 0.15; // domyślna wysokość stania
-        params_.step_height = 0.05;     // wysokość kroku
-        params_.cycle_time = 1.0;       // czas cyklu chodu
-        params_.leg_x_offset = 0.2;     // przesunięcie nogi w osi X
-        params_.leg_y_offset = 0.15;    // przesunięcie nogi w osi Y
+        // Domyślne wartości
+        params_.standing_height = 0.15; // 15cm
+        params_.step_height = 0.05;     // 5cm
+        params_.cycle_time = 1.0;       // 1 sekunda
+        params_.leg_x_offset = 0.1;     // 10cm
+        params_.leg_y_offset = 0.1;     // 10cm
 
-        nh_.param("standing_height", params_.standing_height, params_.standing_height);
-        nh_.param("step_height", params_.step_height, params_.step_height);
-        nh_.param("cycle_time", params_.cycle_time, params_.cycle_time);
-        nh_.param("leg_x_offset", params_.leg_x_offset, params_.leg_x_offset);
-        nh_.param("leg_y_offset", params_.leg_y_offset, params_.leg_y_offset);
+        // Wczytaj parametry z ROS Parameter Server
+        nh_.param<double>("standing_height", params_.standing_height, params_.standing_height);
+        nh_.param<double>("step_height", params_.step_height, params_.step_height);
+        nh_.param<double>("cycle_time", params_.cycle_time, params_.cycle_time);
+        nh_.param<double>("leg_x_offset", params_.leg_x_offset, params_.leg_x_offset);
+        nh_.param<double>("leg_y_offset", params_.leg_y_offset, params_.leg_y_offset);
     }
 
     void GaitController::initializePublishers()
     {
-        // Inicjalizacja publisherów dla każdej nogi
-        for (int i = 0; i < 6; ++i)
+        // Inicjalizacja publisherów dla wszystkich stawów
+        for (int leg_id = 1; leg_id <= 6; ++leg_id)
         {
-            std::string topic = "/hex/leg" + std::to_string(i) + "/command";
-            leg_publishers_.push_back(
-                nh_.advertise<sensor_msgs::JointState>(topic, 1));
+            std::string hip_topic = "/hex_final_urdf/hip_joint_" + std::to_string(leg_id) + "_position_controller/command";
+            std::string knee_topic = "/hex_final_urdf/knee_joint_" + std::to_string(leg_id) + "_position_controller/command";
+            std::string ankle_topic = "/hex_final_urdf/ankle_joint_" + std::to_string(leg_id) + "_position_controller/command";
+
+            joint_publishers_["hip_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(hip_topic, 1);
+            joint_publishers_["knee_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(knee_topic, 1);
+            joint_publishers_["ankle_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(ankle_topic, 1);
         }
     }
 
@@ -80,24 +86,22 @@ namespace hex_controller
         return true;
     }
 
-    void GaitController::setLegJoints(int leg_id, double q1, double q2, double q3)
+    void GaitController::setLegJoints(int leg_id, double hip, double knee, double ankle)
     {
-        sensor_msgs::JointState joint_state;
-        joint_state.header.stamp = ros::Time::now();
+        std_msgs::Float64 msg;
 
-        // Dodaj nazwy stawów
-        joint_state.name = {
-            "coxa_joint" + std::to_string(leg_id),
-            "femur_joint" + std::to_string(leg_id),
-            "tibia_joint" + std::to_string(leg_id)};
+        // Publikuj pozycję biodra
+        msg.data = hip;
+        joint_publishers_["hip_" + std::to_string(leg_id + 1)].publish(msg);
 
-        // Dodaj pozycje stawów
-        joint_state.position = {q1, q2, q3};
+        // Publikuj pozycję kolana
+        msg.data = knee;
+        joint_publishers_["knee_" + std::to_string(leg_id + 1)].publish(msg);
 
-        // Publikuj stan stawów
-        leg_publishers_[leg_id].publish(joint_state);
+        // Publikuj pozycję kostki
+        msg.data = ankle;
+        joint_publishers_["ankle_" + std::to_string(leg_id + 1)].publish(msg);
     }
-
     void GaitController::adjustLegPosition(double &x, double &y,
                                            const geometry_msgs::Twist &cmd_vel)
     {
