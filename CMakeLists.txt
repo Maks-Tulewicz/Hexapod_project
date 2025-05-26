@@ -116,9 +116,17 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
+
+# Biblioteka dla kontrolerów
+add_library(hex_controller
+  src/gait_controller.cpp
+  src/bipod_gait.cpp
+  src/tripod_gait.cpp
+)
+
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
@@ -156,9 +164,17 @@ include_directories(
 add_executable(stand_up_node         src/stand_up.cpp)
 add_executable(walk_two_leg_gait_node src/walk_two_leg_gait.cpp)
 add_executable(two_leg_walk_gait_node src/two_leg_walk_gait_node.cpp)
+add_executable(hexapod_controller_node src/hexapod_controller_node.cpp)
+add_executable(hexapod_teleop_node src/hexapod_teleop_node.cpp)
 
 
-
+target_link_libraries(hexapod_teleop_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(hexapod_controller_node
+  hex_controller
+  ${catkin_LIBRARIES}
+)
 target_link_libraries(stand_up_node          ${catkin_LIBRARIES})
 target_link_libraries(walk_two_leg_gait_node ${catkin_LIBRARIES})
 target_link_libraries(two_leg_walk_gait_node ${catkin_LIBRARIES})
@@ -211,3 +227,19 @@ target_link_libraries(two_leg_walk_gait_node ${catkin_LIBRARIES})
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+install(TARGETS hex_controller hexapod_controller_node hexapod_teleop_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.hpp"
+)
+
+install(DIRECTORY launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  FILES_MATCHING PATTERN "*.launch"
+)
