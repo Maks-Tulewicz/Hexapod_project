@@ -1,7 +1,16 @@
+hexapod_controller:
+  cycle_time: 1.0
+  standing_height: 0.15
+  step_height: 0.05
+  leg_x_offset: 0.1
+  leg_y_offset: 0.1
+
+
+
 # Publish all joint states -----------------------------------
 joint_state_controller:
   type: joint_state_controller/JointStateController
-  publish_rate: 15
+  publish_rate: 50
 
 # Position Co3rollers --------------------------------------
 hip_joint_1_position_controller:

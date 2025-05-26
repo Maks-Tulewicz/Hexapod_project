@@ -13,11 +13,12 @@ namespace hex_controller
 
     struct GaitParameters
     {
-        double standing_height; // wysokość stania
-        double step_height;     // wysokość kroku
-        double cycle_time;      // czas cyklu
-        double leg_x_offset;    // przesunięcie nogi w osi X
-        double leg_y_offset;    // przesunięcie nogi w osi Y
+        double standing_height = 0.15; // domyślna wysokość stania
+        double step_height = 0.05;     // wysokość kroku
+        double cycle_time = 1.0;       // czas cyklu
+        double leg_x_offset = 0.1;     // przesunięcie nogi w X
+        double leg_y_offset = 0.1;     // przesunięcie nogi w Y
+        double turning_radius = 0.3;   // promień skrętu
     };
 
     class GaitController

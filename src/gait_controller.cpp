@@ -46,62 +46,116 @@ namespace hex_controller
 
     void GaitController::standUp()
     {
-        // Implementacja wstawania - wszystkie nogi na tej samej wysokości
+        ROS_INFO("Starting stand up sequence");
+
+        // Najpierw ustaw wszystkie stawy na 0
+        for (int i = 0; i < 6; ++i)
+        {
+            setLegJoints(i, 0, 0, 0);
+        }
+        ros::Duration(0.5).sleep();
+
+        // Teraz podnieś robota
         for (int i = 0; i < 6; ++i)
         {
             double q1 = 0.0, q2 = 0.0, q3 = 0.0;
             if (computeLegIK(i, 0.0, 0.0, params_.standing_height, q1, q2, q3))
             {
+                ROS_INFO("Leg %d IK solution: q1=%.2f, q2=%.2f, q3=%.2f", i, q1, q2, q3);
                 setLegJoints(i, q1, q2, q3);
             }
+            else
+            {
+                ROS_ERROR("Failed to compute IK for leg %d", i);
+            }
+            ros::Duration(0.1).sleep();
         }
-        ros::Duration(1.0).sleep(); // Poczekaj na wykonanie ruchu
+
+        ROS_INFO("Stand up sequence completed");
+        ros::Duration(1.0).sleep();
     }
 
-    bool GaitController::computeLegIK(int leg_id, double x, double y, double z,
-                                      double &q1, double &q2, double &q3)
+    bool GaitController::computeLegIK(int leg_id, double x, double y, double z, double &q1, double &q2, double &q3)
     {
-        // Implementacja odwrotnej kinematyki dla pojedynczej nogi
-        // To jest uproszczona wersja - w rzeczywistości potrzebna będzie
-        // bardziej zaawansowana implementacja
-
-        // Dodaj przesunięcia specyficzne dla każdej nogi
-        double base_angle = M_PI / 3.0 * leg_id;
-        double local_x = x * cos(base_angle) - y * sin(base_angle);
-        double local_y = x * sin(base_angle) + y * cos(base_angle);
-
-        // Proste obliczenia IK (przykładowe)
-        q1 = atan2(local_y, local_x);
-        double r = sqrt(local_x * local_x + local_y * local_y);
-        double h = sqrt(r * r + z * z);
-
-        if (h > 0.3)
-        { // Maksymalny zasięg nogi
+        // Podstawowe sprawdzenie zakresu
+        if (z < 0)
+        {
+            ROS_WARN("Requested z position is below ground");
             return false;
         }
 
-        q2 = -atan2(z, r) - acos((h * h + 0.1) / (2 * h * 0.15));
-        q3 = M_PI - acos((0.1) / (2 * 0.15 * 0.15));
+        // Stałe dla nogi (z pliku hpp)
+        const double L1 = 0.065; // długość hip → knee
+        const double L2 = 0.105; // długość knee → ankle
+        const double L3 = 0.205; // długość ankle → stopa
 
+        // Oblicz kąt biodra (q1)
+        q1 = atan2(y, x);
+
+        // Oblicz długość od biodra do punktu końcowego w płaszczyźnie x-y
+        double r = sqrt(x * x + y * y);
+
+        // Oblicz długość od kolana do punktu końcowego
+        double d = sqrt(r * r + z * z);
+
+        // Sprawdź czy punkt jest osiągalny
+        if (d > (L2 + L3))
+        {
+            ROS_WARN("Position out of reach");
+            return false;
+        }
+
+        // Oblicz kąty używając prawa cosinusów
+        double cos_q3 = (d * d - L2 * L2 - L3 * L3) / (2 * L2 * L3);
+        if (cos_q3 > 1 || cos_q3 < -1)
+        {
+            ROS_WARN("Position unreachable - cosine out of range");
+            return false;
+        }
+
+        // Oblicz q3 (kąt kostki)
+        q3 = acos(cos_q3);
+
+        // Oblicz q2 (kąt kolana)
+        double beta = atan2(z, r);
+        double psi = acos((L2 * L2 + d * d - L3 * L3) / (2 * L2 * d));
+        q2 = beta + psi;
+
+        // Konwersja na właściwe zakresy dla kontrolerów
+        if (leg_id % 2 == 0)
+        { // prawa strona
+            q1 = -q1;
+            q2 = -q2;
+            q3 = -q3;
+        }
+
+        // Dodaj korekty kątów jeśli są potrzebne
+        q2 = M_PI / 2 - q2; // Korekta względem pozycji początkowej
+
+        ROS_DEBUG("IK for leg %d: q1=%.2f, q2=%.2f, q3=%.2f", leg_id, q1, q2, q3);
         return true;
     }
 
-    void GaitController::setLegJoints(int leg_id, double hip, double knee, double ankle)
+    void GaitController::setLegJoints(int leg_id, double q1, double q2, double q3)
     {
         std_msgs::Float64 msg;
 
-        // Publikuj pozycję biodra
-        msg.data = hip;
+        // Hip joint
+        msg.data = q1;
         joint_publishers_["hip_" + std::to_string(leg_id + 1)].publish(msg);
+        ros::Duration(0.01).sleep();
 
-        // Publikuj pozycję kolana
-        msg.data = knee;
+        // Knee joint
+        msg.data = q2;
         joint_publishers_["knee_" + std::to_string(leg_id + 1)].publish(msg);
+        ros::Duration(0.01).sleep();
 
-        // Publikuj pozycję kostki
-        msg.data = ankle;
+        // Ankle joint
+        msg.data = q3;
         joint_publishers_["ankle_" + std::to_string(leg_id + 1)].publish(msg);
+        ros::Duration(0.01).sleep();
     }
+
     void GaitController::adjustLegPosition(double &x, double &y,
                                            const geometry_msgs::Twist &cmd_vel)
     {
