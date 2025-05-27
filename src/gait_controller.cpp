@@ -34,9 +34,9 @@ namespace hex_controller
         // Inicjalizacja publisherów dla wszystkich stawów
         for (int leg_id = 1; leg_id <= 6; ++leg_id)
         {
-            std::string hip_topic = "/hex_final_urdf/hip_joint_" + std::to_string(leg_id) + "_position_controller/command";
-            std::string knee_topic = "/hex_final_urdf/knee_joint_" + std::to_string(leg_id) + "_position_controller/command";
-            std::string ankle_topic = "/hex_final_urdf/ankle_joint_" + std::to_string(leg_id) + "_position_controller/command";
+            std::string hip_topic = "/hip_joint_" + std::to_string(leg_id) + "_position_controller/command";
+            std::string knee_topic = "/knee_joint_" + std::to_string(leg_id) + "_position_controller/command";
+            std::string ankle_topic = "/ankle_joint_" + std::to_string(leg_id) + "_position_controller/command";
 
             joint_publishers_["hip_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(hip_topic, 1);
             joint_publishers_["knee_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(knee_topic, 1);
@@ -48,31 +48,56 @@ namespace hex_controller
     {
         ROS_INFO("Starting stand up sequence");
 
-        // Najpierw ustaw wszystkie stawy na 0
-        for (int i = 0; i < 6; ++i)
-        {
-            setLegJoints(i, 0, 0, 0);
-        }
-        ros::Duration(0.5).sleep();
+        // --- parameters, matching your old stand_up_ik() ---
+        const double final_height = 0.24;             // 24 cm above ground (positive up)
+        const double start_height = 0.15;             // 15 cm above ground to start
+        const int STEPS = 200;                        // total interp steps
+        const double dt = params_.cycle_time / STEPS; // e.g. 1.0/200
 
-        // Teraz podnieś robota
-        for (int i = 0; i < 6; ++i)
+        // target foot positions in the robot frame (meters)
+        const std::map<int, std::vector<double>> target_pos = {
+            {1, {0.18, -0.15, final_height}},
+            {2, {-0.18, -0.15, final_height}},
+            {3, {0.22, 0.00, final_height}},
+            {4, {-0.22, 0.00, final_height}},
+            {5, {0.18, 0.15, final_height}},
+            {6, {-0.18, 0.15, final_height}}};
+
+        // Phase 1: spread legs outward (move X,Y from 0→target, Z stays at start_height)
+        for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
         {
-            double q1 = 0.0, q2 = 0.0, q3 = 0.0;
-            if (computeLegIK(i, 0.0, 0.0, params_.standing_height, q1, q2, q3))
+            double phase = double(step) / (STEPS / 2);
+            for (auto const &[leg, tgt] : target_pos)
             {
-                ROS_INFO("Leg %d IK solution: q1=%.2f, q2=%.2f, q3=%.2f", i, q1, q2, q3);
-                setLegJoints(i, q1, q2, q3);
+                double x = tgt[0] * phase;
+                double y = tgt[1] * phase;
+                double z = start_height;
+
+                double q1, q2, q3;
+                if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                    setLegJoints(leg, q1, q2, q3);
             }
-            else
+            ros::Duration(dt).sleep();
+        }
+        ros::Duration(1.0).sleep(); // pause for stability
+
+        // Phase 2: lower body (legs at target X,Y, Z goes start→final)
+        for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
+        {
+            double phase = double(step) / (STEPS / 2);
+            double z = start_height + (final_height - start_height) * phase;
+            for (auto const &[leg, tgt] : target_pos)
             {
-                ROS_ERROR("Failed to compute IK for leg %d", i);
+                double x = tgt[0], y = tgt[1];
+                double q1, q2, q3;
+                if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                    setLegJoints(leg, q1, q2, q3);
             }
-            ros::Duration(0.1).sleep();
+            ros::Duration(dt).sleep();
         }
 
+        ros::Duration(2.0).sleep();
         ROS_INFO("Stand up sequence completed");
-        ros::Duration(1.0).sleep();
     }
 
     bool GaitController::computeLegIK(int leg_id, double x, double y, double z, double &q1, double &q2, double &q3)

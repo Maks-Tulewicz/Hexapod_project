@@ -24,8 +24,8 @@ public:
         nh_.param("scale_angular", a_scale_, 1.0);
         nh_.param("scale_linear", l_scale_, 1.0);
 
-        vel_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-        gait_pub_ = nh_.advertise<std_msgs::String>("gait_command", 1);
+        vel_pub_ = nh_.advertise<geometry_msgs::Twist>("hex/cmd_vel", 1);
+        gait_pub_ = nh_.advertise<std_msgs::String>("hex/gait_command", 1);
 
         ROS_INFO("Sterowanie hexapodem:");
         ROS_INFO("------------------");
