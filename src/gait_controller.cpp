@@ -31,9 +31,9 @@ namespace hex_controller
 
     void GaitController::initializePublishers()
     {
-        // Inicjalizacja publisherów dla wszystkich stawów
         for (int leg_id = 1; leg_id <= 6; ++leg_id)
         {
+            // use the *same* topics as your walk_two_leg_gait_node
             std::string hip_topic = "/hip_joint_" + std::to_string(leg_id) + "_position_controller/command";
             std::string knee_topic = "/knee_joint_" + std::to_string(leg_id) + "_position_controller/command";
             std::string ankle_topic = "/ankle_joint_" + std::to_string(leg_id) + "_position_controller/command";
@@ -42,46 +42,44 @@ namespace hex_controller
             joint_publishers_["knee_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(knee_topic, 1);
             joint_publishers_["ankle_" + std::to_string(leg_id)] = nh_.advertise<std_msgs::Float64>(ankle_topic, 1);
         }
+        ROS_INFO("Joint publishers initialized on /<joint>_position_controller/command");
     }
 
     void GaitController::standUp()
     {
         ROS_INFO("Starting stand up sequence");
 
-        // --- parameters, matching your old stand_up_ik() ---
-        const double final_height = 0.24;             // 24 cm above ground (positive up)
-        const double start_height = 0.15;             // 15 cm above ground to start
-        const int STEPS = 200;                        // total interp steps
-        const double dt = params_.cycle_time / STEPS; // e.g. 1.0/200
+        // --- two-phase IK stand-up, copied from walk_two_leg_gait_node ---
+        const double final_height = -0.24; // 24cm above ground
+        const double start_height = -0.15; // 15cm above ground
+        const int STEPS = 200;             // smoothness
+        const double dt = params_.cycle_time / STEPS;
 
-        // target foot positions in the robot frame (meters)
+        // target foot positions in robot frame (meters)
         const std::map<int, std::vector<double>> target_pos = {
-            {1, {0.18, -0.15, final_height}},
-            {2, {-0.18, -0.15, final_height}},
-            {3, {0.22, 0.00, final_height}},
-            {4, {-0.22, 0.00, final_height}},
-            {5, {0.18, 0.15, final_height}},
-            {6, {-0.18, 0.15, final_height}}};
-
-        // Phase 1: spread legs outward (move X,Y from 0→target, Z stays at start_height)
+            {1, {18.0, -15.0, start_height}},  // front-left
+            {2, {-18.0, -15.0, start_height}}, // front-right
+            {3, {22.0, 0.0, start_height}},    // middle-left
+            {4, {-22.0, 0.0, start_height}},   // middle-right
+            {5, {18.0, 15.0, start_height}},   // back-left
+            {6, {-18.0, 15.0, start_height}}   // back-right
+        };
+        // Phase 1: spread legs outward (XY from 0→target, Z fixed at start_height)
         for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
         {
             double phase = double(step) / (STEPS / 2);
             for (auto const &[leg, tgt] : target_pos)
             {
-                double x = tgt[0] * phase;
-                double y = tgt[1] * phase;
-                double z = start_height;
-
+                double x = tgt[0] * phase, y = tgt[1] * phase, z = start_height;
                 double q1, q2, q3;
                 if (computeLegIK(leg, x, y, z, q1, q2, q3))
                     setLegJoints(leg, q1, q2, q3);
             }
             ros::Duration(dt).sleep();
         }
-        ros::Duration(1.0).sleep(); // pause for stability
+        ros::Duration(1.0).sleep();
 
-        // Phase 2: lower body (legs at target X,Y, Z goes start→final)
+        // Phase 2: lower body (XY fixed at target, Z from start→final)
         for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
         {
             double phase = double(step) / (STEPS / 2);
@@ -160,24 +158,23 @@ namespace hex_controller
         ROS_DEBUG("IK for leg %d: q1=%.2f, q2=%.2f, q3=%.2f", leg_id, q1, q2, q3);
         return true;
     }
-
     void GaitController::setLegJoints(int leg_id, double q1, double q2, double q3)
     {
         std_msgs::Float64 msg;
 
         // Hip joint
         msg.data = q1;
-        joint_publishers_["hip_" + std::to_string(leg_id + 1)].publish(msg);
+        joint_publishers_.at("hip_" + std::to_string(leg_id)).publish(msg);
         ros::Duration(0.01).sleep();
 
         // Knee joint
         msg.data = q2;
-        joint_publishers_["knee_" + std::to_string(leg_id + 1)].publish(msg);
+        joint_publishers_.at("knee_" + std::to_string(leg_id)).publish(msg);
         ros::Duration(0.01).sleep();
 
         // Ankle joint
         msg.data = q3;
-        joint_publishers_["ankle_" + std::to_string(leg_id + 1)].publish(msg);
+        joint_publishers_.at("ankle_" + std::to_string(leg_id)).publish(msg);
         ros::Duration(0.01).sleep();
     }
 
