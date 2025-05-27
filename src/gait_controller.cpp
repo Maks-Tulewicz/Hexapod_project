@@ -10,6 +10,8 @@ namespace hex_controller
     {
         loadParameters();
         initializePublishers();
+        stand_up_sub_ = nh_.subscribe("/hex/stand_command", 1,
+                                      &GaitController::standUpCallback, this);
     }
 
     void GaitController::loadParameters()
@@ -49,115 +51,145 @@ namespace hex_controller
     {
         ROS_INFO("Starting stand up sequence");
 
-        // --- two-phase IK stand-up, copied from walk_two_leg_gait_node ---
-        const double final_height = -0.24; // 24cm above ground
-        const double start_height = -0.15; // 15cm above ground
-        const int STEPS = 200;             // smoothness
-        const double dt = params_.cycle_time / STEPS;
-
-        // target foot positions in robot frame (meters)
-        const std::map<int, std::vector<double>> target_pos = {
-            {1, {18.0, -15.0, start_height}},  // front-left
-            {2, {-18.0, -15.0, start_height}}, // front-right
-            {3, {22.0, 0.0, start_height}},    // middle-left
-            {4, {-22.0, 0.0, start_height}},   // middle-right
-            {5, {18.0, 15.0, start_height}},   // back-left
-            {6, {-18.0, 15.0, start_height}}   // back-right
-        };
-        // Phase 1: spread legs outward (XY from 0→target, Z fixed at start_height)
-        for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
+        // Najpierw ustaw wszystkie stawy na 0
+        for (int leg_id = 1; leg_id <= 6; ++leg_id)
         {
-            double phase = double(step) / (STEPS / 2);
-            for (auto const &[leg, tgt] : target_pos)
-            {
-                double x = tgt[0] * phase, y = tgt[1] * phase, z = start_height;
-                double q1, q2, q3;
-                if (computeLegIK(leg, x, y, z, q1, q2, q3))
-                    setLegJoints(leg, q1, q2, q3);
-            }
-            ros::Duration(dt).sleep();
+            setLegJoints(leg_id, 0, 0, 0);
         }
         ros::Duration(1.0).sleep();
 
-        // Phase 2: lower body (XY fixed at target, Z from start→final)
-        for (int step = 0; step <= STEPS / 2 && ros::ok(); ++step)
+        const double final_height = -0.24; // Konwersja z cm na m
+        const double start_height = -0.15; // Start from a higher position
+        const double STEPS = 200;          // More steps for smoother motion
+        const double dt = 0.1;             // Zwiększone opóźnienie dla stabilności
+
+        // Szersze rozstawienie nóg dla lepszej stabilności
+        const std::map<int, std::vector<double>> target_positions = {
+            {1, {0.14, -0.10, final_height}},  // lewa przednia
+            {2, {-0.14, -0.10, final_height}}, // prawa przednia
+            {3, {0.17, 0.0, final_height}},    // lewa środkowa
+            {4, {-0.17, 0.0, final_height}},   // prawa środkowa
+            {5, {0.14, 0.10, final_height}},   // lewa tylna
+            {6, {-0.14, 0.10, final_height}}   // prawa tylna
+        };
+
+        // Faza 1: Rozszerzanie nóg
+        ROS_INFO("Phase 1: Spreading legs...");
+        for (int step = 0; step <= STEPS / 2; ++step)
         {
-            double phase = double(step) / (STEPS / 2);
-            double z = start_height + (final_height - start_height) * phase;
-            for (auto const &[leg, tgt] : target_pos)
+            double phase = static_cast<double>(step) / (STEPS / 2);
+
+            for (const auto &[leg, target] : target_positions)
             {
-                double x = tgt[0], y = tgt[1];
+                // Start from center and move outward
+                double x = target[0] * phase;
+                double y = target[1] * phase;
+                double z = start_height;
+
                 double q1, q2, q3;
                 if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                {
                     setLegJoints(leg, q1, q2, q3);
+                    ROS_DEBUG("Leg %d: x=%.3f y=%.3f z=%.3f -> q1=%.3f q2=%.3f q3=%.3f",
+                              leg, x, y, z, q1, q2, q3);
+                }
             }
             ros::Duration(dt).sleep();
         }
 
-        ros::Duration(2.0).sleep();
+        ros::Duration(1.0).sleep();
+
+        // Faza 2: Opuszczanie ciała
+        ROS_INFO("Phase 2: Lowering body...");
+        for (int step = 0; step <= STEPS / 2; ++step)
+        {
+            double phase = static_cast<double>(step) / (STEPS / 2);
+            double current_height = start_height + (final_height - start_height) * phase;
+
+            for (const auto &[leg, target] : target_positions)
+            {
+                double q1, q2, q3;
+                if (computeLegIK(leg, target[0], target[1], current_height, q1, q2, q3))
+                {
+                    setLegJoints(leg, q1, q2, q3);
+                    ROS_DEBUG("Leg %d: x=%.3f y=%.3f z=%.3f -> q1=%.3f q2=%.3f q3=%.3f",
+                              leg, target[0], target[1], current_height, q1, q2, q3);
+                }
+            }
+            ros::Duration(dt).sleep();
+        }
+
         ROS_INFO("Stand up sequence completed");
+        ros::Duration(1.0).sleep();
     }
 
     bool GaitController::computeLegIK(int leg_id, double x, double y, double z, double &q1, double &q2, double &q3)
     {
-        // Podstawowe sprawdzenie zakresu
-        if (z < 0)
+        // Pobierz konfigurację dla danej nogi
+        const auto &leg = leg_origins.at(leg_id);
+
+        // 1) Przesuń współrzędne względem biodra danej nogi
+        double local_x = x - leg.x;
+        double local_y = y - leg.y;
+
+        // 2) Obrót biodra wokół Z
+        q1 = std::atan2(local_y, local_x);
+
+        if (leg.invert_hip)
         {
-            ROS_WARN("Requested z position is below ground");
-            return false;
+            // Dla prawej strony (2,4,6) - obrót o 180 stopni
+            if (q1 > 0)
+                q1 = q1 - M_PI;
+            else
+                q1 = q1 + M_PI;
         }
 
-        // Stałe dla nogi (z pliku hpp)
+        // 3) Dystans promieniowy od osi biodra minus przesunięcie L1
         const double L1 = 0.065; // długość hip → knee
         const double L2 = 0.105; // długość knee → ankle
         const double L3 = 0.205; // długość ankle → stopa
 
-        // Oblicz kąt biodra (q1)
-        q1 = atan2(y, x);
+        double r = std::sqrt(local_x * local_x + local_y * local_y) - L1;
+        double h = -z; // Oś Z w dół dodatnia
 
-        // Oblicz długość od biodra do punktu końcowego w płaszczyźnie x-y
-        double r = sqrt(x * x + y * y);
-
-        // Oblicz długość od kolana do punktu końcowego
-        double d = sqrt(r * r + z * z);
-
-        // Sprawdź czy punkt jest osiągalny
-        if (d > (L2 + L3))
+        // 4) Sprawdź zasięg
+        double D2 = r * r + h * h;
+        double D = std::sqrt(D2);
+        if (D > (L2 + L3) || D < std::fabs(L2 - L3))
         {
-            ROS_WARN("Position out of reach");
+            ROS_WARN("Position out of reach: D=%f, L2+L3=%f, |L2-L3|=%f",
+                     D, L2 + L3, std::fabs(L2 - L3));
             return false;
         }
 
-        // Oblicz kąty używając prawa cosinusów
-        double cos_q3 = (d * d - L2 * L2 - L3 * L3) / (2 * L2 * L3);
-        if (cos_q3 > 1 || cos_q3 < -1)
+        // 5) Kąt gamma między L2 i L3
+        double cos_gamma = (D2 - L2 * L2 - L3 * L3) / (2 * L2 * L3);
+        cos_gamma = std::max(-1.0, std::min(1.0, cos_gamma));
+        double gamma = std::acos(cos_gamma);
+
+        // 6) Kolano (joint 2)
+        double alpha = std::atan2(h, r);
+        double beta = std::acos((D2 + L2 * L2 - L3 * L3) / (2 * L2 * D));
+
+        q2 = -(alpha - beta);
+
+        // 7) Kostka (joint 3)
+        if (leg.invert_knee)
         {
-            ROS_WARN("Position unreachable - cosine out of range");
-            return false;
+            // Dla prawej strony (2,4,6)
+            q3 = gamma - M_PI;
+        }
+        else
+        {
+            // Dla lewej strony (1,3,5)
+            q3 = -(M_PI - gamma);
         }
 
-        // Oblicz q3 (kąt kostki)
-        q3 = acos(cos_q3);
-
-        // Oblicz q2 (kąt kolana)
-        double beta = atan2(z, r);
-        double psi = acos((L2 * L2 + d * d - L3 * L3) / (2 * L2 * d));
-        q2 = beta + psi;
-
-        // Konwersja na właściwe zakresy dla kontrolerów
-        if (leg_id % 2 == 0)
-        { // prawa strona
-            q1 = -q1;
-            q2 = -q2;
-            q3 = -q3;
-        }
-
-        // Dodaj korekty kątów jeśli są potrzebne
-        q2 = M_PI / 2 - q2; // Korekta względem pozycji początkowej
-
-        ROS_DEBUG("IK for leg %d: q1=%.2f, q2=%.2f, q3=%.2f", leg_id, q1, q2, q3);
+        ROS_DEBUG("Leg %d IK: x=%.3f y=%.3f z=%.3f -> q1=%.3f q2=%.3f q3=%.3f",
+                  leg_id, x, y, z, q1, q2, q3);
         return true;
     }
+
     void GaitController::setLegJoints(int leg_id, double q1, double q2, double q3)
     {
         std_msgs::Float64 msg;
@@ -189,6 +221,11 @@ namespace hex_controller
         double max_offset = 0.1;
         x = std::max(std::min(x, max_offset), -max_offset);
         y = std::max(std::min(y, max_offset), -max_offset);
+    }
+    void GaitController::standUpCallback(const std_msgs::Empty &msg)
+    {
+        ROS_INFO("Received stand up command");
+        standUp();
     }
 
 } // namespace hex_controller
