@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <std_msgs/Empty.h>
+#include "hex_controller/single_leg_gait.hpp"
 
 namespace hex_controller
 {
@@ -68,12 +69,10 @@ namespace hex_controller
     protected:
         ros::NodeHandle &nh_;
         ros::Subscriber stand_up_sub_;
-        ros::Subscriber gait_mode_sub_;
-
         std::map<std::string, ros::Publisher> joint_publishers_;
         GaitParameters params_;
         GaitMode current_mode_;
-        bool is_standing_ = false;
+        bool is_standing_; // Zostawiamy flagę tutaj
 
     public:
         explicit GaitController(ros::NodeHandle &nh);
@@ -81,8 +80,9 @@ namespace hex_controller
 
         void setGaitMode(GaitMode mode) { current_mode_ = mode; }
         GaitMode getGaitMode() const { return current_mode_; }
+        bool isStanding() const { return is_standing_; }
 
-        virtual void step(const geometry_msgs::Twist &cmd_vel) = 0;
+        virtual void step(const geometry_msgs::Twist &cmd_vel);
         virtual void standUp();
 
     protected:
@@ -93,13 +93,8 @@ namespace hex_controller
         void setLegJoints(int leg_id, double hip, double knee, double ankle);
         void adjustLegPosition(double &x, double &y,
                                const geometry_msgs::Twist &cmd_vel);
-        void standUpCallback(const std_msgs::Empty &msg);
-
-        void stepSingleLeg(const geometry_msgs::Twist &cmd_vel);
-        void stepTwoLegs(const geometry_msgs::Twist &cmd_vel);
-        void stepThreeLegs(const geometry_msgs::Twist &cmd_vel);
+        void standUpCallback(const std_msgs::Empty::ConstPtr &msg);
     };
 
 } // namespace hex_controller
-
 #endif // GAIT_CONTROLLER_HPP
