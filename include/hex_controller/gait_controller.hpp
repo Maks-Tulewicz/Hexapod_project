@@ -12,6 +12,13 @@
 namespace hex_controller
 {
 
+    enum class GaitMode
+    {
+        SINGLE = 0,
+        TWO_LEG = 1,
+        THREE_LEG = 2
+    };
+
     struct GaitParameters
     {
         double standing_height = 0.15; // domyślna wysokość stania
@@ -63,10 +70,14 @@ namespace hex_controller
         ros::Subscriber stand_up_sub_;
         std::map<std::string, ros::Publisher> joint_publishers_;
         GaitParameters params_;
+        GaitMode current_mode_;
 
     public:
         explicit GaitController(ros::NodeHandle &nh);
         virtual ~GaitController() = default;
+
+        void setGaitMode(GaitMode mode) { current_mode_ = mode; }
+        GaitMode getGaitMode() const { return current_mode_; }
 
         virtual void step(const geometry_msgs::Twist &cmd_vel) = 0;
         virtual void standUp();
@@ -80,6 +91,10 @@ namespace hex_controller
         void adjustLegPosition(double &x, double &y,
                                const geometry_msgs::Twist &cmd_vel);
         void standUpCallback(const std_msgs::Empty &msg);
+
+        void stepSingleLeg(const geometry_msgs::Twist &cmd_vel);
+        void stepTwoLegs(const geometry_msgs::Twist &cmd_vel);
+        void stepThreeLegs(const geometry_msgs::Twist &cmd_vel);
     };
 
 } // namespace hex_controller

@@ -127,8 +127,11 @@ add_library(hex_controller
   src/gait_controller.cpp
   src/bipod_gait.cpp
   src/tripod_gait.cpp
+  src/single_leg_gait.cpp
 )
-
+add_library(hexapod_teleop
+  src/hexapod_teleop_node.cpp
+)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
@@ -180,6 +183,9 @@ target_link_libraries(hexapod_controller_node
 target_link_libraries(stand_up_node          ${catkin_LIBRARIES})
 target_link_libraries(walk_two_leg_gait_node ${catkin_LIBRARIES})
 target_link_libraries(two_leg_walk_gait_node ${catkin_LIBRARIES})
+target_link_libraries(hexapod_teleop
+  ${catkin_LIBRARIES}
+)
 
 
 #############

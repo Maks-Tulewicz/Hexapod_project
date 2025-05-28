@@ -1,133 +1,131 @@
-#include <ros/ros.h>
-#include <geometry_msgs/Twist.h>
-#include <std_msgs/Empty.h> // Dodaj ten nagłówek
+#include "hex_controller/hexapod_teleop.hpp"
 #include <signal.h>
 #include <termios.h>
 #include <stdio.h>
-#include <string>
 
-#define KEYCODE_U 0x75
-#define KEYCODE_I 0x69
-#define KEYCODE_O 0x6F
-#define KEYCODE_J 0x6A
-#define KEYCODE_K 0x6B
-#define KEYCODE_L 0x6C
-#define KEYCODE_M 0x6D
-#define KEYCODE_COMMA 0x2C
-#define KEYCODE_PERIOD 0x2E
-#define KEYCODE_Q 0x71
-#define KEYCODE_Z 0x7A
-#define KEYCODE_X 0x78
-#define KEYCODE_C 0x63
-#define KEYCODE_V 0x76
-#define KEYCODE_B 0x62
-#define KEYCODE_N 0x6E
-#define KEYCODE_R 0x72 // Dodaj klawisz 'r' do wstawania
-
-class HexapodTeleop
+namespace hex_controller
 {
-public:
-    HexapodTeleop();
-    void keyLoop();
 
-private:
-    ros::NodeHandle nh_;
-    ros::Publisher vel_pub_;
-    ros::Publisher stand_pub_; // Publisher dla komendy wstawania
+    static int kfd = 0;
+    static struct termios cooked, raw;
+    static bool quit_requested = false;
 
-    double linear_x_;
-    double linear_y_;
-    double angular_;
-    double l_scale_;
-    double a_scale_;
-};
-
-HexapodTeleop::HexapodTeleop() : linear_x_(0),
-                                 linear_y_(0),
-                                 angular_(0),
-                                 l_scale_(1.0),
-                                 a_scale_(1.0)
-{
-    nh_.param("scale_angular", a_scale_, a_scale_);
-    nh_.param("scale_linear", l_scale_, l_scale_);
-
-    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-    stand_pub_ = nh_.advertise<std_msgs::Empty>("/hex/stand_command", 1);
-}
-
-int kfd = 0;
-struct termios cooked, raw;
-
-void quit(int sig)
-{
-    tcsetattr(kfd, TCSANOW, &cooked);
-    ros::shutdown();
-    exit(0);
-}
-
-void HexapodTeleop::keyLoop()
-{
-    char c;
-    bool dirty = false;
-
-    // get the console in raw mode
-    tcgetattr(kfd, &cooked);
-    memcpy(&raw, &cooked, sizeof(struct termios));
-    raw.c_lflag &= ~(ICANON | ECHO);
-    raw.c_cc[VEOL] = 1;
-    raw.c_cc[VEOF] = 2;
-    tcsetattr(kfd, TCSANOW, &raw);
-
-    puts("Reading from keyboard");
-    puts("---------------------------");
-    puts("Use arrow keys to move the hexapod.");
-    puts("'r' - stand up");
-    puts("'q' - quit");
-
-    for (;;)
+    // Handler dla sygnału SIGINT (Ctrl+C)
+    void quit(int sig)
     {
-        // get the next event from the keyboard
-        if (read(kfd, &c, 1) < 0)
+        tcsetattr(kfd, TCSANOW, &cooked);
+        quit_requested = true;
+        ros::shutdown();
+        exit(0);
+    }
+
+    HexapodTeleop::HexapodTeleop()
+        : linear_x_(0.0), linear_y_(0.0), angular_(0.0), l_scale_(1.0), a_scale_(1.0), dirty_(false)
+    {
+        init();
+    }
+
+    void HexapodTeleop::init()
+    {
+        // Wczytaj parametry
+        nh_.param("scale_angular", a_scale_, a_scale_);
+        nh_.param("scale_linear", l_scale_, l_scale_);
+
+        // Inicjalizuj publishery
+        vel_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+        stand_pub_ = nh_.advertise<std_msgs::Empty>("/hex/stand_command", 1);
+        gait_mode_pub_ = nh_.advertise<std_msgs::Int32>("/hex/gait_mode", 1);
+    }
+
+    void HexapodTeleop::keyLoop()
+    {
+        char c;
+
+        // Przygotuj terminal
+        tcgetattr(kfd, &cooked);
+        memcpy(&raw, &cooked, sizeof(struct termios));
+        raw.c_lflag &= ~(ICANON | ECHO);
+        raw.c_cc[VEOL] = 1;
+        raw.c_cc[VEOF] = 2;
+        tcsetattr(kfd, TCSANOW, &raw);
+
+        puts("Reading from keyboard");
+        puts("---------------------------");
+        puts("Use arrow keys to move the hexapod.");
+        puts("'r' - stand up");
+        puts("'1' - single leg gait");
+        puts("'2' - two leg gait");
+        puts("'3' - three leg gait");
+        puts("'q' - quit");
+
+        while (!quit_requested && ros::ok())
         {
-            perror("read():");
-            exit(-1);
+            // Czytaj znak z klawiatury
+            if (read(kfd, &c, 1) < 0)
+            {
+                perror("read():");
+                exit(-1);
+            }
+
+            updateCommandVelocity(c);
+
+            if (dirty_)
+            {
+                publishVelocity();
+                dirty_ = false;
+            }
         }
 
+        cleanup();
+    }
+
+    void HexapodTeleop::updateCommandVelocity(char c)
+    {
         linear_x_ = linear_y_ = angular_ = 0;
-        ROS_DEBUG("value: 0x%02X\n", c);
 
         switch (c)
         {
-        case KEYCODE_R: // Dodane - obsługa wstawania
-            ROS_DEBUG("STAND UP");
-            {
-                std_msgs::Empty stand_msg;
-                stand_pub_.publish(stand_msg);
-            }
-            break;
+        case KEYCODE_R:
+        {
+            std_msgs::Empty stand_msg;
+            stand_pub_.publish(stand_msg);
+            ROS_INFO("Standing up...");
+        }
+        break;
+        case KEYCODE_1:
+        case KEYCODE_2:
+        case KEYCODE_3:
+        {
+            std_msgs::Int32 mode_msg;
+            mode_msg.data = c - KEYCODE_1;
+            gait_mode_pub_.publish(mode_msg);
+            ROS_INFO("Switching to gait mode %d", mode_msg.data);
+        }
+        break;
         case KEYCODE_I:
             linear_x_ = l_scale_;
-            dirty = true;
+            dirty_ = true;
             break;
         case KEYCODE_K:
             linear_x_ = -l_scale_;
-            dirty = true;
+            dirty_ = true;
             break;
         case KEYCODE_J:
             angular_ = a_scale_;
-            dirty = true;
+            dirty_ = true;
             break;
         case KEYCODE_L:
             angular_ = -a_scale_;
-            dirty = true;
+            dirty_ = true;
             break;
         case KEYCODE_Q:
-            ROS_DEBUG("quit");
-            quit(0);
+            quit_requested = true;
             break;
-            // ... (reszta case'ów bez zmian)
         }
+    }
 
+    void HexapodTeleop::publishVelocity()
+    {
         geometry_msgs::Twist twist;
         twist.linear.x = linear_x_;
         twist.linear.y = linear_y_;
@@ -136,20 +134,22 @@ void HexapodTeleop::keyLoop()
         twist.angular.y = 0;
         twist.angular.z = angular_;
 
-        if (dirty == true)
-        {
-            vel_pub_.publish(twist);
-            dirty = false;
-        }
+        vel_pub_.publish(twist);
     }
-}
+
+    void HexapodTeleop::cleanup()
+    {
+        tcsetattr(kfd, TCSANOW, &cooked);
+    }
+
+} // namespace hex_controller
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "hexapod_teleop");
-    HexapodTeleop teleop;
+    hex_controller::HexapodTeleop teleop;
 
-    signal(SIGINT, quit);
+    signal(SIGINT, hex_controller::quit);
 
     teleop.keyLoop();
 
