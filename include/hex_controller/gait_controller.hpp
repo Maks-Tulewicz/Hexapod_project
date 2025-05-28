@@ -36,6 +36,7 @@ namespace hex_controller
         bool invert_knee; // Obrót kolana - niektóre nogi mają odwrócony kierunek
     };
 
+    // Przywróć prawidłowe pozycje leg_origins:
     // static const std::map<int, LegOrigin> leg_origins = {
     //     {1, {0.068956, -0.077136, false, false}}, // lewa przednia
     //     {2, {-0.086608, -0.077136, true, true}},  // prawa przednia
@@ -44,7 +45,6 @@ namespace hex_controller
     //     {5, {0.068956, 0.078427, false, false}},  // lewa tylna
     //     {6, {-0.086608, 0.078427, true, true}}    // prawa tylna
     // };
-
     static const std::map<int, LegOrigin> leg_origins = {
         {1, {0.0, -0.0, false, false}}, // lewa przednia
         {2, {-0.0, -0.0, true, true}},  // prawa przednia
@@ -53,14 +53,32 @@ namespace hex_controller
         {5, {0.0, 0.0, false, false}},  // lewa tylna
         {6, {-0.0, 0.0, true, true}}    // prawa tylna
     };
-    // W gait_controller.hpp dodaj:
-    static const std::map<int, std::vector<double>> base_positions = {
-        {1, {0.18, -0.15, -0.24}},  // lewa przednia
-        {2, {-0.18, -0.15, -0.24}}, // prawa przednia
-        {3, {0.22, 0.0, -0.24}},    // lewa środkowa
-        {4, {-0.22, 0.0, -0.24}},   // prawa środkowa
-        {5, {0.18, 0.15, -0.24}},   // lewa tylna
-        {6, {-0.18, 0.15, -0.24}}   // prawa tylna
+
+    // Dostosuj base_positions do metrów:
+    // static const std::map<int, std::vector<double>> base_positions = {
+    //     {1, {0.018, -0.015, -0.024}},  // lewa przednia
+    //     {2, {-0.018, -0.015, -0.024}}, // prawa przednia
+    //     {3, {0.022, 0.0, -0.024}},     // lewa środkowa
+    //     {4, {-0.022, 0.0, -0.024}},    // prawa środkowa
+    //     {5, {0.018, 0.015, -0.024}},   // lewa tylna
+    //     {6, {-0.018, 0.015, -0.024}}   // prawa tylna
+    // };
+
+    //   static const std::map<int, std::vector<double>> base_positions = {
+    //         {1, {0.18, -0.15, -0.24}},  // lewa przednia
+    //         {2, {-0.18, -0.15, -0.24}}, // prawa przednia
+    //         {3, {0.22, 0.0, -0.24}},    // lewa środkowa
+    //         {4, {-0.22, 0.0, -0.24}},   // prawa środkowa
+    //         {5, {0.18, 0.15, -0.24}},   // lewa tylna
+    //         {6, {-0.18, 0.15, -0.24}}   // prawa tylna
+    //     };
+    const std::map<int, std::vector<double>> base_positions = {
+        {1, {18.0, -15.0, -24.0}},  // lewa przednia - bardziej na zewnątrz
+        {2, {-18.0, -15.0, -24.0}}, // prawa przednia - bardziej na zewnątrz
+        {3, {22.0, 0.0, -24.0}},    // lewa środkowa - jeszcze bardziej na zewnątrz
+        {4, {-22.0, 0.0, -24.0}},   // prawa środkowa - jeszcze bardziej na zewnątrz
+        {5, {18.0, 15.0, -24.0}},   // lewa tylna - bardziej na zewnątrz
+        {6, {-18.0, 15.0, -24.0}}   // prawa tylna - bardziej na zewnątrz
     };
 
     class GaitController

@@ -3,7 +3,6 @@
 
 namespace hex_controller
 {
-
     SingleLegGait::SingleLegGait(ros::NodeHandle &nh)
         : GaitController(nh)
     {
@@ -13,7 +12,7 @@ namespace hex_controller
 
     void SingleLegGait::step(const geometry_msgs::Twist &cmd_vel)
     {
-        if (!is_standing_)
+        if (!isStanding())
         {
             ROS_WARN_ONCE("Robot must be standing before walking");
             return;
@@ -27,60 +26,48 @@ namespace hex_controller
             return;
         }
 
-        // Parametry kroku
-        const double step_length = params_.leg_x_offset * std::abs(cmd_vel.linear.x);
-        const double step_height = params_.step_height;
-        const int STEPS = 30;
-        const double dt = 0.01;
+        // Parametry ruchu (w metrach!)
+        const double step_length = 0.04; // 4cm = 0.04m
+        const double step_height = 0.03; // 3cm = 0.03m
+        const int STEPS = 60;
+        const double dt = 0.005;
+
+        std::vector<int> leg_sequence = {1, 6, 2, 5, 3, 4};
 
         for (int leg : leg_sequence)
         {
             const auto &base = base_positions.at(leg);
+            double start_x = base[0]; // Już w metrach
+            double start_y = base[1];
+            double start_z = base[2];
 
             // Faza unoszenia nogi
             for (int step = 0; step <= STEPS / 2; ++step)
             {
                 double phase = static_cast<double>(step) / (STEPS / 2);
 
-                // Interpolacja pozycji
-                double x = base[0];
-                double y = base[1];
-                double z = base[2] - step_height * std::sin(M_PI * phase);
-
-                // Dodaj ruch do przodu/tyłu
-                if (cmd_vel.linear.x > 0)
+                // Pozycja X - ruch do przodu/tyłu
+                double x = start_x;
+                if (cmd_vel.linear.x != 0)
                 {
-                    x += step_length * phase;
-                }
-                else if (cmd_vel.linear.x < 0)
-                {
-                    x -= step_length * phase;
+                    x += step_length * std::cos(M_PI * phase) * (cmd_vel.linear.x > 0 ? 1 : -1);
                 }
 
-                // Dodaj ruch w bok
+                // Pozycja Y - ruch na boki
+                double y = start_y;
                 if (cmd_vel.linear.y != 0)
                 {
-                    y += cmd_vel.linear.y * params_.leg_y_offset * phase;
+                    y += step_length * std::cos(M_PI * phase) * cmd_vel.linear.y;
                 }
 
-                // Dodaj obrót
-                if (cmd_vel.angular.z != 0)
-                {
-                    double angle = cmd_vel.angular.z * params_.turning_radius;
-                    if (leg <= 2)
-                    { // przednie nogi
-                        y += angle * phase;
-                    }
-                    else if (leg >= 5)
-                    { // tylne nogi
-                        y -= angle * phase;
-                    }
-                }
+                // Pozycja Z - ruch góra/dół
+                double z = start_z - step_height * std::sin(M_PI * phase);
 
-                double q1, q2, q3;
-                if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                // Używamy wspólnej implementacji kinematyki odwrotnej
+                double hip, knee, ankle;
+                if (computeLegIK(leg, x, y, z, hip, knee, ankle))
                 {
-                    setLegJoints(leg, q1, q2, q3);
+                    setLegJoints(leg, hip, knee, ankle);
                 }
 
                 ros::Duration(dt).sleep();
@@ -91,49 +78,30 @@ namespace hex_controller
             {
                 double phase = static_cast<double>(step) / (STEPS / 2);
 
-                double x = base[0];
-                double y = base[1];
-                double z = base[2] - step_height * std::sin(M_PI * (1 - phase));
-
-                if (cmd_vel.linear.x > 0)
+                double x = start_x;
+                if (cmd_vel.linear.x != 0)
                 {
-                    x += step_length * (1 - phase);
-                }
-                else if (cmd_vel.linear.x < 0)
-                {
-                    x -= step_length * (1 - phase);
+                    x += step_length * std::cos(M_PI * (1 - phase)) * (cmd_vel.linear.x > 0 ? 1 : -1);
                 }
 
+                double y = start_y;
                 if (cmd_vel.linear.y != 0)
                 {
-                    y += cmd_vel.linear.y * params_.leg_y_offset * (1 - phase);
+                    y += step_length * std::cos(M_PI * (1 - phase)) * cmd_vel.linear.y;
                 }
 
-                if (cmd_vel.angular.z != 0)
-                {
-                    double angle = cmd_vel.angular.z * params_.turning_radius;
-                    if (leg <= 2)
-                    {
-                        y += angle * (1 - phase);
-                    }
-                    else if (leg >= 5)
-                    {
-                        y -= angle * (1 - phase);
-                    }
-                }
+                double z = start_z - step_height * std::sin(M_PI * (1 - phase));
 
-                double q1, q2, q3;
-                if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                double hip, knee, ankle;
+                if (computeLegIK(leg, x, y, z, hip, knee, ankle))
                 {
-                    setLegJoints(leg, q1, q2, q3);
+                    setLegJoints(leg, hip, knee, ankle);
                 }
 
                 ros::Duration(dt).sleep();
             }
 
-            // Mała pauza między nogami
             ros::Duration(0.1).sleep();
         }
     }
-
 } // namespace hex_controller
