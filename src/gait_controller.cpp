@@ -59,9 +59,9 @@ namespace hex_controller
         ros::Duration(1.0).sleep();
 
         const double final_height = -0.24; // Konwersja z cm na m
-        const double start_height = -0.15; // Start from a higher position
-        const double STEPS = 200;          // More steps for smoother motion
-        const double dt = 0.1;             // Zwiększone opóźnienie dla stabilności
+        const double start_height = -0.19; // Start from a higher position
+        const double STEPS = 150;          // More steps for smoother motion
+        const double dt = 0.05;            // Zwiększone opóźnienie dla stabilności
 
         // Szersze rozstawienie nóg dla lepszej stabilności
         const std::map<int, std::vector<double>> target_positions = {
@@ -118,7 +118,7 @@ namespace hex_controller
             }
             ros::Duration(dt).sleep();
         }
-
+        is_standing_ = true;
         ROS_INFO("Stand up sequence completed");
         ros::Duration(1.0).sleep();
     }
@@ -235,7 +235,6 @@ namespace hex_controller
             ROS_INFO("Robot is already standing");
         }
     }
-
     void GaitController::step(const geometry_msgs::Twist &cmd_vel)
     {
         if (!is_standing_)
