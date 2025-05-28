@@ -68,9 +68,12 @@ namespace hex_controller
     protected:
         ros::NodeHandle &nh_;
         ros::Subscriber stand_up_sub_;
+        ros::Subscriber gait_mode_sub_;
+
         std::map<std::string, ros::Publisher> joint_publishers_;
         GaitParameters params_;
         GaitMode current_mode_;
+        bool is_standing_ = false;
 
     public:
         explicit GaitController(ros::NodeHandle &nh);

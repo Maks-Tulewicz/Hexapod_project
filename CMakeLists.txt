@@ -128,9 +128,23 @@ add_library(hex_controller
   src/bipod_gait.cpp
   src/tripod_gait.cpp
   src/single_leg_gait.cpp
+  src/gait_manager.cpp
 )
+
+# Linkowanie głównej biblioteki
+target_link_libraries(hex_controller
+  ${catkin_LIBRARIES}
+)
+
+# Biblioteka teleop
 add_library(hexapod_teleop
   src/hexapod_teleop_node.cpp
+)
+
+# Linkowanie teleop
+target_link_libraries(hexapod_teleop
+  ${catkin_LIBRARIES}
+  hex_controller
 )
 
 ## Declare a C++ library
@@ -166,26 +180,38 @@ add_library(hexapod_teleop
 
 ## --- Custom ROS Node ---
 ## --- C++ nody ---
-add_executable(stand_up_node         src/stand_up.cpp)
+add_executable(stand_up_node src/stand_up.cpp)
 add_executable(walk_two_leg_gait_node src/walk_two_leg_gait.cpp)
 add_executable(two_leg_walk_gait_node src/two_leg_walk_gait_node.cpp)
 add_executable(hexapod_controller_node src/hexapod_controller_node.cpp)
 add_executable(hexapod_teleop_node src/hexapod_teleop_node.cpp)
 
-
+# Linkowanie node'ów
 target_link_libraries(hexapod_teleop_node
   ${catkin_LIBRARIES}
+  hexapod_teleop
 )
+
 target_link_libraries(hexapod_controller_node
+  ${catkin_LIBRARIES}
   hex_controller
-  ${catkin_LIBRARIES}
 )
-target_link_libraries(stand_up_node          ${catkin_LIBRARIES})
-target_link_libraries(walk_two_leg_gait_node ${catkin_LIBRARIES})
-target_link_libraries(two_leg_walk_gait_node ${catkin_LIBRARIES})
-target_link_libraries(hexapod_teleop
+
+target_link_libraries(stand_up_node 
   ${catkin_LIBRARIES}
+  hex_controller
 )
+
+target_link_libraries(walk_two_leg_gait_node 
+  ${catkin_LIBRARIES}
+  hex_controller
+)
+
+target_link_libraries(two_leg_walk_gait_node 
+  ${catkin_LIBRARIES}
+  hex_controller
+)
+
 
 
 #############

@@ -224,8 +224,38 @@ namespace hex_controller
     }
     void GaitController::standUpCallback(const std_msgs::Empty &msg)
     {
-        ROS_INFO("Received stand up command");
-        standUp();
+        if (!is_standing_)
+        {
+            ROS_INFO("Received stand up command");
+            standUp();
+            is_standing_ = true;
+        }
+        else
+        {
+            ROS_INFO("Robot is already standing");
+        }
+    }
+
+    void GaitController::step(const geometry_msgs::Twist &cmd_vel)
+    {
+        if (!is_standing_)
+        {
+            ROS_WARN("Robot must be standing before walking");
+            return;
+        }
+
+        // switch (current_mode_)
+        // {
+        // case GaitMode::SINGLE:
+        //     stepSingleLeg(cmd_vel);
+        //     break;
+        // case GaitMode::TWO_LEG:
+        //     stepTwoLegs(cmd_vel);
+        //     break;
+        // case GaitMode::THREE_LEG:
+        //     stepThreeLegs(cmd_vel);
+        //     break;
+        // }
     }
 
 } // namespace hex_controller

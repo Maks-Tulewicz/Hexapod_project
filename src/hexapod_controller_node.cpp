@@ -6,6 +6,7 @@
 #include "hex_controller/gait_controller.hpp"
 #include "hex_controller/tripod_gait.hpp"
 #include "hex_controller/bipod_gait.hpp"
+#include "hex_controller/gait_manager.hpp"
 
 class HexapodController
 {
@@ -68,7 +69,11 @@ public:
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "hexapod_controller");
-    HexapodController controller;
+    ros::NodeHandle nh;
+
+    hex_controller::GaitManager manager(nh);
+
     ros::spin();
+
     return 0;
 }
