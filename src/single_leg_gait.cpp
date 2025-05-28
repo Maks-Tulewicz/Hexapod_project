@@ -12,138 +12,22 @@ namespace hex_controller
 
     void SingleLegGait::initializeParameters()
     {
-        // Zmniejszamy parametry ruchu dla zachowania zasięgu
-        params_.step_length = 4.0;       // Zmniejszamy długość kroku dla bezpieczeństwa
-        params_.step_height = 5.0;       // Wysokość podnoszenia
-        params_.cycle_time = 0.4;        // Znacznie szybszy cykl (było 1.8s)
-        params_.body_shift = 1.0;        // Przesunięcie boczne
-        params_.standing_height = -24.0; // Wysokość stania    }
-    }
+        // Parametry chodu
+        params_.step_length = 4.0;       // Długość kroku
+        params_.step_height = 3.0;       // Wysokość podnoszenia
+        params_.cycle_time = 0.6;        // Szybki cykl
+        params_.body_shift = 1.0;        // Przesunięcie przy obrocie
+        params_.standing_height = -24.0; // Wysokość stania
+        params_.leg_x_offset = 0.1;      // Przesunięcie nogi w X
+        params_.leg_y_offset = 0.1;      // Przesunięcie nogi w Y
+        params_.turning_radius = 0.3;    // Promień skrętu
 
-    void SingleLegGait::moveSingleLeg(int leg_number, const std::vector<double> &start_pos,
-                                      const geometry_msgs::Twist &cmd_vel)
-    {
-        const int STEPS = 30; // Szybszy ruch
-        const double dt = params_.cycle_time / STEPS;
-
-        using namespace hex_controller::robot_geometry;
-
-        for (int step = 0; step <= STEPS; ++step)
-        {
-            double phase = static_cast<double>(step) / STEPS;
-
-            // WAŻNE: Zachowujemy początkową pozycję X
-            double x = start_pos[0]; // Pozycja X pozostaje stała przy ruchu do przodu
-            double y = start_pos[1]; // Tu będzie ruch do przodu/tyłu
-            double z = start_pos[2]; // Wysokość
-
-            if (phase <= 0.5)
-            {
-                // Faza przenoszenia
-                double swing_phase = phase * 2.0;
-
-                // KLUCZOWA ZMIANA: Ruch do przodu w osi Y
-                // Odwrócony znak dla właściwego kierunku (tak jak w walk_two_leg)
-                y = start_pos[1] - params_.step_length *
-                                       (1.0 - std::cos(M_PI * swing_phase)) *
-                                       (cmd_vel.linear.x > 0 ? 1 : -1);
-
-                // Ruch w górę i w dół
-                z = start_pos[2] - params_.step_height * std::sin(M_PI * swing_phase);
-
-                // Ruch boczny (jeśli jest) - w osi X
-                if (std::abs(cmd_vel.linear.y) > 0.01)
-                {
-                    x = start_pos[0] + params_.step_length *
-                                           (1.0 - std::cos(M_PI * swing_phase)) *
-                                           cmd_vel.linear.y;
-                }
-            }
-            else
-            {
-                // Faza podporowa
-                double support_phase = (phase - 0.5) * 2.0;
-
-                // WAŻNE: Powrót do pozycji początkowej w osi Y
-                y = (start_pos[1] - params_.step_length *
-                                        (cmd_vel.linear.x > 0 ? 1 : -1)) +
-                    params_.step_length * support_phase *
-                        (cmd_vel.linear.x > 0 ? 1 : -1);
-
-                // Powrót z ruchu bocznego (jeśli był)
-                if (std::abs(cmd_vel.linear.y) > 0.01)
-                {
-                    x = start_pos[0] + params_.step_length *
-                                           cmd_vel.linear.y * (1.0 - support_phase);
-                }
-            }
-
-            // Obsługa obrotu (jeśli jest)
-            if (std::abs(cmd_vel.angular.z) > 0.01)
-            {
-                const auto &leg = leg_origins.at(leg_number);
-                double turn_angle = params_.body_shift * cmd_vel.angular.z;
-
-                // Przednie nogi (1,2)
-                if (leg_number <= 2)
-                {
-                    x += turn_angle * std::sin(2 * M_PI * phase);
-                }
-                // Tylne nogi (5,6)
-                else if (leg_number >= 5)
-                {
-                    x -= turn_angle * std::sin(2 * M_PI * phase);
-                }
-            }
-
-            // Debug info
-            ROS_DEBUG("Leg %d: phase=%.2f, x=%.2f, y=%.2f, z=%.2f",
-                      leg_number, phase, x, y, z);
-
-            // Kinematyka odwrotna
-            double hip, knee, ankle;
-            if (computeLegIK(leg_number, x, y, z, hip, knee, ankle))
-            {
-                setLegJoints(leg_number, hip, knee, ankle);
-            }
-
-            ros::Duration(dt).sleep();
-        }
-    }
-
-    void SingleLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
-    {
-        const std::vector<int> leg_sequence = {1, 6, 2, 5, 3, 4};
-
-        for (int leg : leg_sequence)
-        {
-            ROS_INFO("Ruch nogi %d", leg);
-
-            // 1. Wykonaj ruch nogą
-            const auto &base = base_positions.at(leg);
-            moveSingleLeg(leg, base, cmd_vel);
-
-            // 2. Krótka pauza na stabilizację
-            ros::Duration(0.05).sleep(); // Zmniejszona z 0.1
-
-            // 3. Przesunięcie tułowia (powrót do pozycji środkowej)
-            if (cmd_vel.linear.x != 0)
-            {
-                // Przeciwny ruch tułowia - połowa długości kroku
-                geometry_msgs::Twist body_shift;
-                body_shift.linear.x = -cmd_vel.linear.x * 0.5;
-
-                // Przesuń wszystkie nogi względem tułowia
-                for (int support_leg = 1; support_leg <= 6; ++support_leg)
-                {
-                    if (support_leg != leg) // Nie ruszaj aktywnej nogi
-                    {
-                        const auto &support_base = base_positions.at(support_leg);
-                        moveSingleLeg(support_leg, support_base, body_shift);
-                    }
-                }
-            }
-        }
+        // Parametry trajektorii
+        traj_params_.lift_phase = 0.3;     // 30% cyklu na podnoszenie
+        traj_params_.transfer_phase = 0.4; // 40% cyklu na przenoszenie
+        traj_params_.lower_phase = 0.3;    // 30% cyklu na opuszczanie
+        traj_params_.stance_height = params_.standing_height;
+        traj_params_.clearance = params_.step_height;
     }
     void SingleLegGait::step(const geometry_msgs::Twist &cmd_vel)
     {
@@ -161,8 +45,138 @@ namespace hex_controller
             return;
         }
 
-        // Wykonaj pojedynczy krok
         makeStep(cmd_vel);
+    }
+
+    void SingleLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
+    {
+        const std::vector<int> leg_sequence = {1, 6, 2, 5, 3, 4};
+
+        for (int leg : leg_sequence)
+        {
+            ROS_INFO("Ruch nogi %d", leg);
+
+            // 1. Wykonaj ruch nogą
+            const auto &base = base_positions.at(leg);
+            moveSingleLeg(leg, base, cmd_vel);
+
+            // 2. Krótka pauza na stabilizację
+            ros::Duration(0.05).sleep();
+
+            // 3. Przesunięcie tułowia
+            if (cmd_vel.linear.x != 0)
+            {
+                geometry_msgs::Twist body_shift;
+                body_shift.linear.x = -cmd_vel.linear.x * 0.5;
+
+                for (int support_leg = 1; support_leg <= 6; ++support_leg)
+                {
+                    if (support_leg != leg)
+                    {
+                        const auto &support_base = base_positions.at(support_leg);
+                        moveSingleLeg(support_leg, support_base, body_shift);
+                    }
+                }
+            }
+        }
+    }
+
+    void SingleLegGait::moveSingleLeg(int leg_number,
+                                      const std::vector<double> &start_pos,
+                                      const geometry_msgs::Twist &cmd_vel)
+    {
+        const int STEPS = 50;
+        const double dt = params_.cycle_time / STEPS;
+
+        for (int step = 0; step <= STEPS; ++step)
+        {
+            double phase = static_cast<double>(step) / STEPS;
+            double x = start_pos[0];
+            double y = start_pos[1];
+            double z = params_.standing_height;
+
+            // Określenie fazy ruchu
+            if (phase <= traj_params_.lift_phase)
+            {
+                // Faza 1: Podnoszenie nogi
+                double lift_ratio = phase / traj_params_.lift_phase;
+                z = params_.standing_height -
+                    traj_params_.clearance * smoothStep(lift_ratio);
+
+                if (std::abs(cmd_vel.linear.x) > 0.01)
+                {
+                    double forward_ratio = lift_ratio * 0.2;
+                    y = start_pos[1] - params_.step_length *
+                                           forward_ratio * (cmd_vel.linear.x > 0 ? 1 : -1);
+                }
+            }
+            else if (phase <= traj_params_.lift_phase + traj_params_.transfer_phase)
+            {
+                // Faza 2: Przenoszenie nogi
+                double transfer_phase = (phase - traj_params_.lift_phase) /
+                                        traj_params_.transfer_phase;
+
+                z = params_.standing_height - traj_params_.clearance;
+
+                if (std::abs(cmd_vel.linear.x) > 0.01)
+                {
+                    double forward_ratio = 0.2 + 0.6 * smoothStep(transfer_phase);
+                    y = start_pos[1] - params_.step_length *
+                                           forward_ratio * (cmd_vel.linear.x > 0 ? 1 : -1);
+                }
+
+                if (std::abs(cmd_vel.linear.y) > 0.01)
+                {
+                    x = start_pos[0] + params_.step_length *
+                                           smoothStep(transfer_phase) * cmd_vel.linear.y;
+                }
+            }
+            else
+            {
+                // Faza 3: Opuszczanie nogi
+                double lower_ratio = (phase - (traj_params_.lift_phase +
+                                               traj_params_.transfer_phase)) /
+                                     traj_params_.lower_phase;
+
+                z = params_.standing_height -
+                    traj_params_.clearance * (1.0 - smoothStep(lower_ratio));
+
+                if (std::abs(cmd_vel.linear.x) > 0.01)
+                {
+                    double forward_ratio = 0.8 + 0.2 * smoothStep(lower_ratio);
+                    y = start_pos[1] - params_.step_length *
+                                           forward_ratio * (cmd_vel.linear.x > 0 ? 1 : -1);
+                }
+
+                if (std::abs(cmd_vel.linear.y) > 0.01)
+                {
+                    x = start_pos[0] + params_.step_length *
+                                           cmd_vel.linear.y;
+                }
+            }
+
+            // Obsługa obrotu
+            if (std::abs(cmd_vel.angular.z) > 0.01)
+            {
+                const auto &leg = leg_origins.at(leg_number);
+                double turn_angle = params_.body_shift * cmd_vel.angular.z;
+                double turn_factor = smoothStep(phase);
+
+                if (leg_number <= 2)
+                    x += turn_angle * turn_factor;
+                else if (leg_number >= 5)
+                    x -= turn_angle * turn_factor;
+            }
+
+            // Kinematyka odwrotna
+            double hip, knee, ankle;
+            if (computeLegIK(leg_number, x, y, z, hip, knee, ankle))
+            {
+                setLegJoints(leg_number, hip, knee, ankle);
+            }
+
+            ros::Duration(dt).sleep();
+        }
     }
 
     void SingleLegGait::walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps)
@@ -173,19 +187,18 @@ namespace hex_controller
             return;
         }
 
-        // Ustaw parametry chodu
-        params_.step_length = 6.0; // Zmniejszona długość kroku
-        params_.step_height = 4.0; // Zmniejszona wysokość podnoszenia
-        params_.cycle_time = 1.8;
-        params_.body_shift = 2.0;
-        params_.standing_height = -24.0;
-
         for (int step = 0; step < num_steps && ros::ok(); ++step)
         {
             ROS_INFO("Wykonuję krok %d z %d", step + 1, num_steps);
             makeStep(cmd_vel);
-            ros::Duration(0.2).sleep(); // Pauza między krokami
+            ros::Duration(0.2).sleep();
         }
+    }
+
+    double SingleLegGait::smoothStep(double x)
+    {
+        x = std::max(0.0, std::min(1.0, x));
+        return x * x * (3 - 2 * x);
     }
 
 } // namespace hex_controller

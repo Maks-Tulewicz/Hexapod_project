@@ -34,10 +34,12 @@ namespace hex_controller
     {
         double standing_height = 0.15; // domyślna wysokość stania
         double step_height = 0.05;     // wysokość kroku
+        double step_length = 4.0;      // długość kroku
         double cycle_time = 1.0;       // czas cyklu
         double leg_x_offset = 0.1;     // przesunięcie nogi w X
         double leg_y_offset = 0.1;     // przesunięcie nogi w Y
         double turning_radius = 0.3;   // promień skrętu
+        double body_shift = 1.0;       // przesunięcie tułowia podczas obrotu
     };
     struct LegOrigin
     {
