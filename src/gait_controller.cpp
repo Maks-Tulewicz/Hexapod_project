@@ -118,6 +118,8 @@ namespace hex_controller
             }
             ros::Duration(dt).sleep();
         }
+        is_standing_ = true;
+
         ROS_INFO("Stand up sequence completed");
         ros::Duration(1.0).sleep();
     }
@@ -242,6 +244,19 @@ namespace hex_controller
         //     stepThreeLegs(cmd_vel);
         //     break;
         // }
+    }
+    void GaitController::standUpCallback(const std_msgs::Empty::ConstPtr &msg)
+    {
+        if (!is_standing_)
+        {
+            ROS_INFO("Received stand up command");
+            standUp();
+            is_standing_ = true;
+        }
+        else
+        {
+            ROS_INFO("Robot is already standing");
+        }
     }
 
 } // namespace hex_controller

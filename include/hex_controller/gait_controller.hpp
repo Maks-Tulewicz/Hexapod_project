@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 #include <std_msgs/Empty.h>
-#include "hex_controller/single_leg_gait.hpp"
 
 namespace hex_controller
 {
@@ -82,8 +81,9 @@ namespace hex_controller
         GaitMode getGaitMode() const { return current_mode_; }
         bool isStanding() const { return is_standing_; }
 
-        virtual void step(const geometry_msgs::Twist &cmd_vel);
+        virtual void step(const geometry_msgs::Twist &cmd_vel) = 0;
         virtual void standUp();
+        void setStanding(bool standing) { is_standing_ = standing; }
 
     protected:
         void initializePublishers();
