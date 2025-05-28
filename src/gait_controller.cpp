@@ -60,7 +60,7 @@ namespace hex_controller
 
         const double final_height = -24.0; // Konwersja z cm na m
         const double start_height = -20.0; // Start from a higher position
-        const double STEPS = 80;           // More steps for smoother motion
+        const double STEPS = 50;           // More steps for smoother motion
         const double dt = 0.05;            // Zwiększone opóźnienie dla stabilności
 
         // Szersze rozstawienie nóg dla lepszej stabilności

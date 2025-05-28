@@ -2,9 +2,6 @@
 <robot name="hex_final_urdf" xmlns:xacro="http://www.ros.org/wiki/xacro" >
 
 <xacro:property name="body_color" value="Gazebo/Silver" />
-<gazebo>
-  <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so"/>
-</gazebo>
 
 
 <gazebo>
