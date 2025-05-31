@@ -2,39 +2,43 @@
 #define ONE_LEG_GAIT_H
 
 #include "hex_final_urdf_description/base_gait.h"
+#include <geometry_msgs/Twist.h>
+#include <std_msgs/Empty.h>
 
 namespace hexapod
 {
-
-    struct GaitParams
+    struct WalkingParameters
     {
-        double step_length;     // długość kroku
-        double step_height;     // wysokość podnoszenia nogi
-        double cycle_time;      // czas jednego cyklu ruchu nogi
-        double body_shift;      // przesunięcie ciała podczas przenoszenia nogi
-        double standing_height; // wysokość podczas stania
+        double step_height;
+        double step_length;
+        double cycle_time;
+        double standing_height;
+        double body_shift;
     };
 
     class OneLegGait : public BaseGait
     {
     private:
-        GaitParams params_;
-        std::vector<int> leg_sequence_;
+        WalkingParameters params_;
+        bool is_standing_;
+        ros::Subscriber stand_up_sub_;
 
     public:
         explicit OneLegGait(ros::NodeHandle &nh);
+        ~OneLegGait() override = default;
 
         void initialize() override;
         bool execute() override;
         void stop() override;
 
-        void setStepSize(double length, double height);
-        void setSpeed(double cycle_time);
+        void setParameters(const WalkingParameters &params) { params_ = params; }
+        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps = 1);
+        bool isStanding() const { return is_standing_; }
 
     private:
-        bool standUp();
-        void performStepCycle();
-        bool moveLeg(int leg_number, double x, double y, double z);
+        void standUpCallback(const std_msgs::EmptyConstPtr &msg);
+        void makeStep(const geometry_msgs::Twist &cmd_vel);
+        double smoothStep(double x);
     };
 
 } // namespace hexapod

@@ -5,10 +5,10 @@
 #include <std_msgs/Float64.h>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace hexapod
 {
-
     struct LegOrigin
     {
         double x;
@@ -23,12 +23,12 @@ namespace hexapod
         ros::NodeHandle &nh_;
         std::map<std::string, ros::Publisher> joint_publishers_;
 
-        // Parametry geometryczne nóg
+        // Parametry geometryczne nóg (w cm)
         static constexpr double L1 = 6.5;  // hip → knee
         static constexpr double L2 = 10.5; // knee → ankle
         static constexpr double L3 = 20.5; // ankle → stopa
 
-        // Pozycje bioder względem centrum robota (na podstawie URDF)
+        // Pozycje bioder względem centrum robota
         static const std::map<int, LegOrigin> leg_origins;
 
     public:
@@ -43,8 +43,9 @@ namespace hexapod
         void initializePublishers();
         bool setJointPosition(const std::string &joint_name, double position);
         bool computeLegIK(int leg_number, double x, double y, double z,
-                          double &hip_angle, double &knee_angle, double &ankle_angle);
-        static const std::map<int, std::vector<double>> base_positions;
+                          double &q1, double &q2, double &q3);
+        void setLegJoints(int leg_number, double q1, double q2, double q3);
+        bool standUp();
     };
 
 } // namespace hexapod

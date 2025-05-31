@@ -3,7 +3,6 @@
 
 namespace hexapod
 {
-
     // Initialize static member
     const std::map<int, LegOrigin> BaseGait::leg_origins = {
         {1, {0.068956, -0.077136, false, false}}, // lewa przednia
@@ -12,15 +11,6 @@ namespace hexapod
         {4, {-0.118826, -0.000645, true, true}},  // prawa środkowa
         {5, {0.068956, 0.078427, false, false}},  // lewa tylna
         {6, {-0.086608, 0.078427, true, true}}    // prawa tylna
-    };
-
-    const std::map<int, std::vector<double>> BaseGait::base_positions = {
-        {1, {18.0, -15.0, -24.0}},  // lewa przednia
-        {2, {-18.0, -15.0, -24.0}}, // prawa przednia
-        {3, {22.0, 0.0, -24.0}},    // lewa środkowa
-        {4, {-22.0, 0.0, -24.0}},   // prawa środkowa
-        {5, {18.0, 15.0, -24.0}},   // lewa tylna
-        {6, {-18.0, 15.0, -24.0}}   // prawa tylna
     };
 
     BaseGait::BaseGait(ros::NodeHandle &nh) : nh_(nh) {}
@@ -36,28 +26,6 @@ namespace hexapod
                 std::string joint_name = type + "_joint_" + std::to_string(leg);
                 std::string topic = "/" + joint_name + "_position_controller/command";
                 joint_publishers_[joint_name] = nh_.advertise<std_msgs::Float64>(topic, 1);
-
-                // Dodajmy debug
-                ROS_INFO("Initializing publisher for joint: %s on topic: %s",
-                         joint_name.c_str(), topic.c_str());
-
-                // Czekamy na subskrybentów
-                ros::Time start = ros::Time::now();
-                while (joint_publishers_[joint_name].getNumSubscribers() == 0 &&
-                       ros::ok() && (ros::Time::now() - start).toSec() < 3.0)
-                {
-                    ros::Duration(0.1).sleep();
-                    ROS_INFO_THROTTLE(1.0, "Waiting for subscribers on %s", topic.c_str());
-                }
-
-                if (joint_publishers_[joint_name].getNumSubscribers() == 0)
-                {
-                    ROS_WARN("No subscribers for %s after timeout", topic.c_str());
-                }
-                else
-                {
-                    ROS_INFO("Got subscribers for %s", topic.c_str());
-                }
             }
         }
     }
@@ -75,6 +43,13 @@ namespace hexapod
         msg.data = position;
         it->second.publish(msg);
         return true;
+    }
+
+    void BaseGait::setLegJoints(int leg_number, double q1, double q2, double q3)
+    {
+        setJointPosition("hip_joint_" + std::to_string(leg_number), q1);
+        setJointPosition("knee_joint_" + std::to_string(leg_number), q2);
+        setJointPosition("ankle_joint_" + std::to_string(leg_number), q3);
     }
 
     bool BaseGait::computeLegIK(int leg_number, double x, double y, double z,
@@ -128,12 +103,79 @@ namespace hexapod
 
         q3 = -(beta - alpha);
 
-        ROS_DEBUG("Leg %d (type: %s) IK result:", leg_number,
-                  leg.invert_knee ? "right" : "left");
-        ROS_DEBUG("  q1 (hip): %.2f°", q1 * 180.0 / M_PI);
-        ROS_DEBUG("  q2 (knee): %.2f°", q2 * 180.0 / M_PI);
-        ROS_DEBUG("  q3 (ankle): %.2f°", q3 * 180.0 / M_PI);
-
         return true;
     }
+
+    bool BaseGait::standUp()
+    {
+        const double final_height = -34.0; // Końcowa wysokość
+        const double start_height = -15.0; // Wyższa pozycja startowa
+        const int STEPS = 200;             // Więcej kroków dla płynniejszego ruchu
+        const double dt = 0.05;
+
+        // Szersze rozstawienie nóg dla lepszej stabilności
+        const std::map<int, std::vector<double>> target_positions = {
+            {1, {18.0, -15.0, final_height}},  // lewa przednia - bardziej na zewnątrz
+            {2, {-18.0, -15.0, final_height}}, // prawa przednia - bardziej na zewnątrz
+            {3, {22.0, 0.0, final_height}},    // lewa środkowa - jeszcze bardziej na zewnątrz
+            {4, {-22.0, 0.0, final_height}},   // prawa środkowa - jeszcze bardziej na zewnątrz
+            {5, {18.0, 15.0, final_height}},   // lewa tylna - bardziej na zewnątrz
+            {6, {-18.0, 15.0, final_height}}   // prawa tylna - bardziej na zewnątrz
+        };
+
+        // Faza 1: rozstaw nogi szerzej
+        for (int step = 0; step <= STEPS / 2; ++step)
+        {
+            double phase = static_cast<double>(step) / (STEPS / 2);
+
+            for (const auto &[leg, target] : target_positions)
+            {
+                // Zacznij od aktualnej pozycji i przesuwaj na zewnątrz
+                double x = target[0] * phase;
+                double y = target[1] * phase;
+                double z = start_height; // Utrzymuj wyżej na początku
+
+                double q1, q2, q3;
+                if (computeLegIK(leg, x, y, z, q1, q2, q3))
+                {
+                    setLegJoints(leg, q1, q2, q3);
+                }
+                else
+                {
+                    ROS_ERROR("IK failed for leg %d during stand up", leg);
+                    return false;
+                }
+            }
+            ros::Duration(dt).sleep();
+        }
+
+        ros::Duration(1.0).sleep(); // Pauza dla stabilizacji
+
+        // Faza 2: opuść ciało
+        for (int step = 0; step <= STEPS / 2; ++step)
+        {
+            double phase = static_cast<double>(step) / (STEPS / 2);
+            double current_height = start_height + (final_height - start_height) * phase;
+
+            for (const auto &[leg, target] : target_positions)
+            {
+                double q1, q2, q3;
+                if (computeLegIK(leg, target[0], target[1], current_height, q1, q2, q3))
+                {
+                    setLegJoints(leg, q1, q2, q3);
+                }
+                else
+                {
+                    ROS_ERROR("IK failed for leg %d during stand up", leg);
+                    return false;
+                }
+            }
+            ros::Duration(dt).sleep();
+        }
+
+        ros::Duration(2.0).sleep();
+        ROS_INFO("Robot wstał stabilnie.");
+        return true;
+    }
+
 } // namespace hexapod
