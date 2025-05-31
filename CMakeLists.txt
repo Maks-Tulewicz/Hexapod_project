@@ -66,25 +66,27 @@ foreach(node ${LEGACY_NODES})
 endforeach()
 
 # Komentujemy nową implementację do czasu utworzenia plików
-# add_library(${PROJECT_NAME}
-#   src/base_gait.cpp
-#   src/one_leg_gait.cpp
-# )
+ add_library(${PROJECT_NAME}
+   src/base_gait.cpp
+   src/one_leg_gait.cpp
+ )
 
-# target_link_libraries(${PROJECT_NAME}
-#   ${catkin_LIBRARIES}
-# )
+ target_link_libraries(${PROJECT_NAME}
+   ${catkin_LIBRARIES}
+ )
+
+ add_executable(tests_node src/tests_node.cpp)
+ target_link_libraries(tests_node
+   ${PROJECT_NAME}
+   ${catkin_LIBRARIES}
+ )
+
 
 # add_executable(tests_node src/tests_node.cpp)
-# target_link_libraries(tests_node
-#   ${PROJECT_NAME}
-#   ${catkin_LIBRARIES}
-# )
-add_executable(tests_node src/tests_node.cpp)
-target_link_libraries(tests_node
-  hex_controller  # Na razie linkujemy ze starą biblioteką
-  ${catkin_LIBRARIES}
-)
+#target_link_libraries(tests_node
+#  hex_controller  # Na razie linkujemy ze starą biblioteką
+#  ${catkin_LIBRARIES}
+#)
 
 
 # Install targets
