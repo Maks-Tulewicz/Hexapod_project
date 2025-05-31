@@ -11,91 +11,84 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES hex_controller ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} hex_controller
   CATKIN_DEPENDS rospy roscpp std_msgs
 )
 
 include_directories(
   include
-  include/${PROJECT_NAME}
   ${catkin_INCLUDE_DIRS}
 )
 
-# Stare biblioteki i executable - zachowane ale zakomentowane
-# add_library(hex_controller
-#   src/gait_controller.cpp
-#   src/bipod_gait.cpp
-#   src/tripod_gait.cpp
-#   src/single_leg_gait.cpp
-#   src/gait_manager.cpp
-# )
+# Stare pliki, które zostały przeniesione do głównego katalogu src
+add_executable(stand_up_node src/stand_up.cpp)
+add_executable(walk_two_leg_gait_node src/walk_two_leg_gait.cpp)
 
-# target_link_libraries(hex_controller
-#   ${catkin_LIBRARIES}
-# )
-
-# add_library(hexapod_teleop
-#   src/hexapod_teleop_node.cpp
-# )
-
-# target_link_libraries(hexapod_teleop
-#   ${catkin_LIBRARIES}
-#   hex_controller
-# )
-
-# Nowa implementacja - biblioteka base_gait
-add_library(${PROJECT_NAME}
-  src/base_gait.cpp
-  src/one_leg_gait.cpp
+# Legacy biblioteka z pozostałymi starymi plikami
+add_library(hex_controller
+  src/legacy/gait_controller.cpp
+  src/legacy/bipod_gait.cpp
+  src/legacy/tripod_gait.cpp
+  src/legacy/single_leg_gait.cpp
+  src/legacy/gait_manager.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}
+# Linkowanie hex_controller
+target_link_libraries(hex_controller
   ${catkin_LIBRARIES}
 )
 
-# Stare executable - zakomentowane
-# add_executable(stand_up_node src/stand_up.cpp)
-# add_executable(walk_two_leg_gait_node src/walk_two_leg_gait.cpp)
-# add_executable(two_leg_walk_gait_node src/two_leg_walk_gait_node.cpp)
-# add_executable(hexapod_controller_node src/hexapod_controller_node.cpp)
-# add_executable(hexapod_teleop_node src/hexapod_teleop_node.cpp)
+# Linkowanie starych node'ów
+target_link_libraries(stand_up_node
+  hex_controller
+  ${catkin_LIBRARIES}
+)
 
-# Nowy executable
+target_link_libraries(walk_two_leg_gait_node
+  hex_controller
+  ${catkin_LIBRARIES}
+)
+
+# Legacy nodes pozostałe w katalogu legacy
+set(LEGACY_NODES
+  hexapod_controller_node
+  hexapod_teleop_node
+  two_leg_walk_gait_node
+)
+
+# Tworzenie i linkowanie pozostałych legacy nodes
+foreach(node ${LEGACY_NODES})
+  add_executable(${node} src/legacy/${node}.cpp)
+  target_link_libraries(${node}
+    hex_controller
+    ${catkin_LIBRARIES}
+  )
+endforeach()
+
+# Komentujemy nową implementację do czasu utworzenia plików
+# add_library(${PROJECT_NAME}
+#   src/base_gait.cpp
+#   src/one_leg_gait.cpp
+# )
+
+# target_link_libraries(${PROJECT_NAME}
+#   ${catkin_LIBRARIES}
+# )
+
+# add_executable(tests_node src/tests_node.cpp)
+# target_link_libraries(tests_node
+#   ${PROJECT_NAME}
+#   ${catkin_LIBRARIES}
+# )
 add_executable(tests_node src/tests_node.cpp)
-add_dependencies(tests_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
 target_link_libraries(tests_node
-  ${PROJECT_NAME}
+  hex_controller  # Na razie linkujemy ze starą biblioteką
   ${catkin_LIBRARIES}
 )
 
-# Stare target_link_libraries - zakomentowane
-# target_link_libraries(hexapod_teleop_node
-#   ${catkin_LIBRARIES}
-#   hexapod_teleop
-# )
 
-# target_link_libraries(hexapod_controller_node
-#   ${catkin_LIBRARIES}
-#   hex_controller
-# )
-
-# target_link_libraries(stand_up_node 
-#   ${catkin_LIBRARIES}
-#   hex_controller
-# )
-
-# target_link_libraries(walk_two_leg_gait_node 
-#   ${catkin_LIBRARIES}
-#   hex_controller
-# )
-
-# target_link_libraries(two_leg_walk_gait_node 
-#   ${catkin_LIBRARIES}
-#   hex_controller
-# )
-
-install(TARGETS ${PROJECT_NAME} tests_node
+# Install targets
+install(TARGETS hex_controller stand_up_node walk_two_leg_gait_node ${LEGACY_NODES} tests_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -107,7 +100,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   PATTERN ".svn" EXCLUDE
 )
 
-install(DIRECTORY launch
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
   FILES_MATCHING PATTERN "*.launch"
 )
