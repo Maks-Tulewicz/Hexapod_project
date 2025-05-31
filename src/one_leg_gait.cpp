@@ -5,11 +5,11 @@ namespace hexapod
     OneLegGait::OneLegGait(ros::NodeHandle &nh)
         : BaseGait(nh)
     {
-        params_.step_height = 4.0;
-        params_.step_length = 5.0;
-        params_.cycle_time = 1.0;
-        params_.standing_height = -24.0;
-        params_.body_shift = 5.0;
+        params_.step_height = 6.0;
+        params_.step_length = 7.0;
+        params_.cycle_time = 2.8;
+        params_.standing_height = 24.0; // minus jest w obliczeniach
+        params_.body_shift = 2.0;
     }
 
     void OneLegGait::initialize()
@@ -47,38 +47,87 @@ namespace hexapod
 
     void OneLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
     {
-        if (!is_standing_)
+        if (!isStanding())
             return;
 
-        const int STEPS = 50;
-        const double dt = params_.cycle_time / STEPS;
+        const int STEPS = 60;
+        const double dt = 0.05;
 
-        // Implementacja pojedynczego kroku dla każdej nogi po kolei
+        // Pozycje bazowe dla nóg
+        const std::map<int, std::vector<double>> base_positions = {
+            {1, {18.0, -15.0, -24.0}}, // UWAGA: z jest ujemne!
+            {2, {-18.0, -15.0, -24.0}},
+            {3, {22.0, 0.0, -24.0}},
+            {4, {-22.0, 0.0, -24.0}},
+            {5, {18.0, 15.0, -24.0}},
+            {6, {-18.0, 15.0, -24.0}}};
+
         for (int leg = 1; leg <= 6; ++leg)
         {
+            ROS_INFO("=== Rozpoczynam ruch nogi %d ===", leg);
+            const auto &base_pos = base_positions.at(leg);
+
             for (int step = 0; step <= STEPS; ++step)
             {
                 double phase = static_cast<double>(step) / STEPS;
-                double smooth_phase = smoothStep(phase);
 
-                // Oblicz pozycję nogi
-                double x = 0.0;
-                double y = params_.step_length * std::sin(phase * M_PI);
-                double z = -params_.standing_height +
-                           params_.step_height * std::sin(phase * M_PI);
+                // Startujemy od pozycji bazowej
+                double x = base_pos[0];
+                double y = base_pos[1];
+                double z = base_pos[2]; // Już jest ujemne!
 
-                // Uwzględnij kierunek ruchu z cmd_vel
-                if (cmd_vel.linear.x != 0.0)
-                    y *= cmd_vel.linear.x > 0 ? 1.0 : -1.0;
+                if (phase <= 0.5)
+                {
+                    double swing_phase = phase * 2.0;
+                    double step_length = params_.step_length;
+
+                    if (cmd_vel.linear.x != 0.0)
+                        step_length *= cmd_vel.linear.x > 0 ? 1.0 : -1.0;
+
+                    // Ruch do przodu/tyłu
+                    y += step_length * (1.0 - std::cos(M_PI * swing_phase));
+
+                    // Podnoszenie nogi - dodajemy do z, bo z jest ujemne
+                    z -= params_.step_height * std::sin(M_PI * swing_phase);
+                }
+                else
+                {
+                    double support_phase = (phase - 0.5) * 2.0;
+                    double step_length = params_.step_length;
+
+                    if (cmd_vel.linear.x != 0.0)
+                        step_length *= cmd_vel.linear.x > 0 ? 1.0 : -1.0;
+
+                    // Powrót do pozycji
+                    y += step_length * (1.0 - support_phase);
+                }
+
+                if (step % 10 == 0)
+                {
+                    ROS_INFO("Noga %d, Krok %d/%d:", leg, step, STEPS);
+                    ROS_INFO("  Pozycja: x=%.3f, y=%.3f, z=%.3f", x, y, z);
+                    ROS_INFO("  Faza: %.2f", phase);
+                }
 
                 double q1, q2, q3;
                 if (computeLegIK(leg, x, y, z, q1, q2, q3))
                 {
+                    double q1_deg = q1 * 180.0 / M_PI;
+                    double q2_deg = q2 * 180.0 / M_PI;
+                    double q3_deg = q3 * 180.0 / M_PI;
+
+                    if (step % 10 == 0)
+                    {
+                        ROS_INFO("  Kąty [deg]: hip=%.1f, knee=%.1f, ankle=%.1f",
+                                 q1_deg, q2_deg, q3_deg);
+                    }
                     setLegJoints(leg, q1, q2, q3);
                 }
 
                 ros::Duration(dt).sleep();
             }
+            ROS_INFO("=== Zakończono ruch nogi %d ===\n", leg);
+            ros::Duration(0.1).sleep();
         }
     }
 

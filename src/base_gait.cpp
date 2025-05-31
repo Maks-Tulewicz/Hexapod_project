@@ -127,7 +127,7 @@ namespace hexapod
         const double final_height = -24.0; // Końcowa wysokość
         const double start_height = -20.0; // Wyższa pozycja startowa
         const int STEPS = 200;             // Więcej kroków dla płynniejszego ruchu
-        const double dt = 0.01;
+        const double dt = 0.03;
 
         // Szersze rozstawienie nóg dla lepszej stabilności
         const std::map<int, std::vector<double>> target_positions = {
@@ -190,6 +190,7 @@ namespace hexapod
         }
 
         ros::Duration(2.0).sleep();
+        is_standing_ = true;
         ROS_INFO("Robot wstał stabilnie.");
         return true;
     }
