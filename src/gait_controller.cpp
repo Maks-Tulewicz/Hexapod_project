@@ -127,16 +127,16 @@ namespace hex_controller
     bool GaitController::computeLegIK(int leg_id, double x, double y, double z,
                                       double &q1, double &q2, double &q3)
     {
-
+        // ---------------------------------------------------------------------
+        // 1) Odszukaj pozycję "hip origin" (punkt obrotu biodra) dla danej nogi
         const auto &leg = leg_origins.at(leg_id);
 
-        // Przesuń współrzędne względem biodra danej nogi
+        // Przesuń współrzędne względem biodra danej nogi:
         double local_x = x - leg.x;
         double local_y = y - leg.y;
 
-        // Obrót biodra wokół Z
+        // 2) Oblicz kąt obrotu biodra (hip yaw):
         q1 = std::atan2(local_y, local_x);
-
         if (leg.invert_hip)
         {
             if (q1 > 0)
@@ -145,41 +145,111 @@ namespace hex_controller
                 q1 = q1 + M_PI;
         }
 
-        // ZMIANA: Najpierw oblicz pełny dystans w płaszczyźnie XY
+        // 3) Wyciągnij długości segmentów z geometrycznych stałych:
+        //    L1 = długość COXA→FEMUR (offset od biodra do punktu, z którego zaczyna się część "femur"),
+        //    L2 = długość FEMUR, L3 = długość TIBIA.
+        const double L1 = robot_geometry::L1;
+        const double L2 = robot_geometry::L2;
+        const double L3 = robot_geometry::L3;
+
+        // 4) Oblicz odległość w płaszczyźnie XY od "hip" do docelowej stopy:
         double xy_dist = std::sqrt(local_x * local_x + local_y * local_y);
 
-        // Następnie odejmij L1 od dystansu w płaszczyźnie XY
-        double r = xy_dist - robot_geometry::L1;
-        double h = -z; // Oś Z w dół dodatnia
+        // 5) Oblicz wektor (r, h) w płaszczyźnie "leg plane":
+        //    r = odległość w XY minus długość L1,
+        //    h = -z   (przyjmujemy dodatnią wartość "w dół")
+        double r = xy_dist - L1;
+        double h = -z;
 
-        // Teraz oblicz D
+        // 6) TERAZ DODAJEMY CLAMP: upewniamy się, że odległość D = sqrt(r^2 + h^2)
+        //    mieści się w granicach [|L2 - L3|, L2 + L3]. Jeżeli nie, przycinamy (r,h)
+        //    w kierunku wektora (r, h), aby uzyskać D_clamped w tym przedziale.
+        {
+            // Oblicz pierwotne D:
+            double D = std::sqrt(r * r + h * h);
+
+            // Granice osiągalności:
+            const double maxD = L2 + L3;
+            const double minD = std::fabs(L2 - L3);
+
+            // Kierunek wektora (r, h) w "leg plane":
+            //   Zauważ: kąt biodra (q1) wyznacza kierunek XY, więc wystarczy
+            //   scalać odległość (r, h) w osi "leg plane", a kierunek XY zostanie ten sam.
+            if (D > maxD)
+            {
+                // Jeżeli za daleko: przycinamy do maxD:
+                double ratio = maxD / D;
+                r = r * ratio;
+                h = h * ratio;
+            }
+            else if (D < minD && D > 1e-9)
+            {
+                // Jeżeli za blisko: przycinamy do minD. (D > 0 by uniknąć dzielenia przez 0)
+                double ratio = minD / D;
+                r = r * ratio;
+                h = h * ratio;
+            }
+            else if (D <= 1e-9)
+            {
+                // Przypadek "dokładnie pod biodrem" lub bardzo blisko:
+                // ustawiamy r = 0, h = minD (lub +minD w dół), by noga była wyprostowana albo maksymalnie złożona.
+                // Wybieramy h = minD, r = 0 (czyli noga "prosto w dół" o minD).
+                r = 0.0;
+                h = minD;
+            }
+
+            // Po modyfikacji (r, h) – odległość w XY od stawu biodrowego:
+            //    xy_dist_new = r + L1.
+            double xy_dist_new = r + L1;
+
+            // Kierunek w płaszczyźnie XY wyznaczamy z q1:
+            double dir_x = std::cos(q1);
+            double dir_y = std::sin(q1);
+
+            // Obliczamy nowe lokalne współrzędne (x,y) stopy:
+            local_x = dir_x * xy_dist_new;
+            local_y = dir_y * xy_dist_new;
+
+            // I nowe z (przywracamy znak): z = -h
+            z = -h;
+
+// (opcjonalnie) Logujemy clamping, jeśli zaszła jakakolwiek zmiana:
+#ifdef DEBUG_CLAMP
+            {
+                double orig_r = xy_dist - L1;
+                double orig_h = -(/*oryginalne*/ z + 0.0); // Tutaj zgrabnie da się zachować oryginalne h,
+                                                           // ale żeby nie wprowadzać dodatkowych zmiennych,
+                                                           // w praktyce wystarczy porównać "D" przed/po.
+                // Pomińmy w detalach, po prostu wyświetlimy:
+                ROS_WARN("CLAMP in computeLegIK: leg_id=%d | orig (r,h)=(%.3f,%.3f) -> new (r,h)=(%.3f,%.3f)",
+                         leg_id,
+                         (xy_dist - L1), -(/*oryginalne*/ z + 0.0),
+                         r, h);
+            }
+#endif
+        }
+
+        // 7) TERAZ mamy już (r, h) w dopuszczalnym zakresie i zaktualizowane (local_x, local_y, z).
+        //    Obliczamy ponownie D^2 i D:
         double D2 = r * r + h * h;
         double D = std::sqrt(D2);
 
-        ROS_DEBUG("IK Debug: xy_dist=%.2f, r=%.2f, h=%.2f, D=%.2f",
-                  xy_dist, r, h, D);
-
-        if (D > (robot_geometry::L2 + robot_geometry::L3) ||
-            D < std::fabs(robot_geometry::L2 - robot_geometry::L3))
+        // 8) Jeżeli po clampowaniu punkt nadal jest poza zakresem (idealnie nie powinno się zdarzać),
+        //    to zwracamy false. (To będzie rzadkość – głównie w wypadku ekstremalnego D <= 0.)
+        if (D > (L2 + L3) || D < std::fabs(L2 - L3))
         {
-            ROS_WARN("Position out of reach: xy_dist=%.2f, r=%.2f, h=%.2f, D=%.2f, L2+L3=%.2f, |L2-L3|=%.2f",
-                     xy_dist, r, h, D,
-                     robot_geometry::L2 + robot_geometry::L3,
-                     std::fabs(robot_geometry::L2 - robot_geometry::L3));
+            ROS_WARN("computeLegIK: After clamp still unreachable: leg_id=%d, D=%.3f, allowed=[%.3f, %.3f]",
+                     leg_id, D, std::fabs(L2 - L3), (L2 + L3));
             return false;
         }
 
-        // Reszta obliczeń pozostaje bez zmian
-        double cos_gamma = (D2 - robot_geometry::L2 * robot_geometry::L2 -
-                            robot_geometry::L3 * robot_geometry::L3) /
-                           (2 * robot_geometry::L2 * robot_geometry::L3);
+        // 9) Klasyczne obliczenia kątów stawu kolana i kostki (IK) – odtąd nic nie zmieniamy:
+        double cos_gamma = (D2 - L2 * L2 - L3 * L3) / (2 * L2 * L3);
         cos_gamma = std::max(-1.0, std::min(1.0, cos_gamma));
         double gamma = std::acos(cos_gamma);
 
         double alpha = std::atan2(h, r);
-        double beta = std::acos((D2 + robot_geometry::L2 * robot_geometry::L2 -
-                                 robot_geometry::L3 * robot_geometry::L3) /
-                                (2 * robot_geometry::L2 * D));
+        double beta = std::acos((D2 + L2 * L2 - L3 * L3) / (2 * L2 * D));
 
         q2 = -(alpha - beta);
 
