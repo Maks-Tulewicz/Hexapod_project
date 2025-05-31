@@ -8,6 +8,8 @@ int main(int argc, char **argv)
 
     hexapod::OneLegGait gait(nh);
     gait.initialize();
+    gait.execute();
+    gait.stop();
 
     // Czekaj na wiadomości
     ros::spin();

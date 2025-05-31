@@ -3,31 +3,38 @@
 namespace hexapod
 {
     OneLegGait::OneLegGait(ros::NodeHandle &nh)
-        : BaseGait(nh), is_standing_(false)
+        : BaseGait(nh)
     {
-        params_.step_height = 5.0;
-        params_.step_length = 10.0;
+        params_.step_height = 4.0;
+        params_.step_length = 5.0;
         params_.cycle_time = 1.0;
-        params_.standing_height = 24.0;
+        params_.standing_height = -24.0;
         params_.body_shift = 5.0;
-
-        stand_up_sub_ = nh_.subscribe<std_msgs::Empty>("stand_up", 1,
-                                                       &OneLegGait::standUpCallback, this);
     }
 
     void OneLegGait::initialize()
     {
         initializePublishers();
         ROS_INFO("One leg gait initialized");
-        standUp(); // Ustaw robota w pozycji stojącej
     }
 
     bool OneLegGait::execute()
     {
+        standUp(); // Ustaw robota w pozycji stojącej
+
         if (!is_standing_)
         {
             ROS_WARN("Robot must be standing before walking");
             return false;
+        }
+        else
+        {
+            // Wykonaj ruch do przodu z domyślną prędkością
+            geometry_msgs::Twist cmd_vel;
+            cmd_vel.linear.x = 0.5;  // Prędkość do przodu
+            cmd_vel.angular.z = 0.0; // Brak obrotu
+
+            walkForward(cmd_vel, 10); // Wykonaj 10 kroków
         }
         return true;
     }
@@ -38,25 +45,6 @@ namespace hexapod
         ROS_INFO("Stopping one leg gait");
     }
 
-    void OneLegGait::standUpCallback(const std_msgs::EmptyConstPtr &msg)
-    {
-        if (!is_standing_)
-        {
-            if (BaseGait::standUp())
-            {
-                is_standing_ = true;
-                ROS_INFO("Robot stood up successfully");
-            }
-            else
-            {
-                ROS_ERROR("Failed to stand up");
-            }
-        }
-        else
-        {
-            ROS_INFO("Robot is already standing");
-        }
-    }
     void OneLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
     {
         if (!is_standing_)

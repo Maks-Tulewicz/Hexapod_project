@@ -13,7 +13,13 @@ namespace hexapod
         {6, {-0.086608, 0.078427, true, true}}    // prawa tylna
     };
 
-    BaseGait::BaseGait(ros::NodeHandle &nh) : nh_(nh) {}
+    BaseGait::BaseGait(ros::NodeHandle &nh)
+        : nh_(nh), is_standing_(false)
+    {
+        // Subscriber do komendy stand_up
+        stand_up_sub_ = nh_.subscribe<std_msgs::Empty>(
+            "stand_up", 1, &BaseGait::standUpCallback, this);
+    }
 
     void BaseGait::initializePublishers()
     {
@@ -91,27 +97,37 @@ namespace hexapod
             return false;
         }
 
-        // 5. Obliczenie kąta kolana (q2)
-        double cos_q2 = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3);
-        cos_q2 = std::max(-1.0, std::min(1.0, cos_q2));
+        // 5. Obliczenie gamma (kąt między L2 i L3)
+        double cos_gamma = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3);
+        cos_gamma = std::max(-1.0, std::min(1.0, cos_gamma));
+        double gamma = std::acos(cos_gamma);
 
-        q2 = -std::acos(cos_q2); // Podstawowe odwrócenie dla wszystkich nóg
+        // 6. Obliczenie kąta kolana (q2)
+        double alpha = std::atan2(h, r);
+        double beta = std::acos((D2 + L2 * L2 - L3 * L3) / (2.0 * L2 * D));
+        q2 = -(alpha - beta);
 
-        // 6. Obliczenie kąta kostki (q3)
-        double beta = std::atan2(h, r);
-        double alpha = std::atan2(L3 * std::sin(q2), L2 + L3 * std::cos(q2));
-
-        q3 = -(beta - alpha);
+        // 7. Obliczenie kąta kostki (q3) - używamy sprawdzonej metody z walk_two_leg_gait
+        if (leg.invert_knee)
+        {
+            // Dla prawej strony (2,4,6)
+            q3 = gamma - M_PI;
+        }
+        else
+        {
+            // Dla lewej strony (1,3,5)
+            q3 = -(M_PI - gamma);
+        }
 
         return true;
     }
 
     bool BaseGait::standUp()
     {
-        const double final_height = -34.0; // Końcowa wysokość
-        const double start_height = -15.0; // Wyższa pozycja startowa
+        const double final_height = -24.0; // Końcowa wysokość
+        const double start_height = -20.0; // Wyższa pozycja startowa
         const int STEPS = 200;             // Więcej kroków dla płynniejszego ruchu
-        const double dt = 0.05;
+        const double dt = 0.01;
 
         // Szersze rozstawienie nóg dla lepszej stabilności
         const std::map<int, std::vector<double>> target_positions = {
@@ -177,5 +193,24 @@ namespace hexapod
         ROS_INFO("Robot wstał stabilnie.");
         return true;
     }
-
+    void BaseGait::standUpCallback(const std_msgs::Empty::ConstPtr &msg)
+    {
+        if (!is_standing_)
+        {
+            ROS_INFO("Rozpoczynam sekwencję wstawania...");
+            if (standUp())
+            {
+                is_standing_ = true;
+                ROS_INFO("Robot wstał pomyślnie");
+            }
+            else
+            {
+                ROS_ERROR("Nie udało się wstać");
+            }
+        }
+        else
+        {
+            ROS_INFO("Robot już stoi");
+        }
+    }
 } // namespace hexapod

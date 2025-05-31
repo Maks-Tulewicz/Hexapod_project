@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
+#include <std_msgs/Empty.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -22,6 +23,8 @@ namespace hexapod
     protected:
         ros::NodeHandle &nh_;
         std::map<std::string, ros::Publisher> joint_publishers_;
+        ros::Subscriber stand_up_sub_;
+        bool is_standing_;
 
         // Parametry geometryczne nóg (w cm)
         static constexpr double L1 = 6.5;  // hip → knee
@@ -39,13 +42,19 @@ namespace hexapod
         virtual bool execute() = 0;
         virtual void stop() = 0;
 
+        // Metody związane ze stanem wstawania
+        bool isStanding() const { return is_standing_; }
+        bool standUp();
+
     protected:
         void initializePublishers();
         bool setJointPosition(const std::string &joint_name, double position);
         bool computeLegIK(int leg_number, double x, double y, double z,
                           double &q1, double &q2, double &q3);
         void setLegJoints(int leg_number, double q1, double q2, double q3);
-        bool standUp();
+
+    private:
+        void standUpCallback(const std_msgs::Empty::ConstPtr &msg);
     };
 
 } // namespace hexapod
