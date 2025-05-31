@@ -44,6 +44,7 @@ namespace hexapod
         bool setJointPosition(const std::string &joint_name, double position);
         bool computeLegIK(int leg_number, double x, double y, double z,
                           double &hip_angle, double &knee_angle, double &ankle_angle);
+        static const std::map<int, std::vector<double>> base_positions;
     };
 
 } // namespace hexapod

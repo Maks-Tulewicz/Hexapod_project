@@ -14,6 +14,15 @@ namespace hexapod
         {6, {-0.086608, 0.078427, true, true}}    // prawa tylna
     };
 
+    const std::map<int, std::vector<double>> BaseGait::base_positions = {
+        {1, {18.0, -15.0, -24.0}},  // lewa przednia
+        {2, {-18.0, -15.0, -24.0}}, // prawa przednia
+        {3, {22.0, 0.0, -24.0}},    // lewa środkowa
+        {4, {-22.0, 0.0, -24.0}},   // prawa środkowa
+        {5, {18.0, 15.0, -24.0}},   // lewa tylna
+        {6, {-18.0, 15.0, -24.0}}   // prawa tylna
+    };
+
     BaseGait::BaseGait(ros::NodeHandle &nh) : nh_(nh) {}
 
     void BaseGait::initializePublishers()
@@ -28,12 +37,26 @@ namespace hexapod
                 std::string topic = "/" + joint_name + "_position_controller/command";
                 joint_publishers_[joint_name] = nh_.advertise<std_msgs::Float64>(topic, 1);
 
-                // Wait for subscriber
+                // Dodajmy debug
+                ROS_INFO("Initializing publisher for joint: %s on topic: %s",
+                         joint_name.c_str(), topic.c_str());
+
+                // Czekamy na subskrybentów
                 ros::Time start = ros::Time::now();
                 while (joint_publishers_[joint_name].getNumSubscribers() == 0 &&
                        ros::ok() && (ros::Time::now() - start).toSec() < 3.0)
                 {
-                    ros::Duration(0.05).sleep();
+                    ros::Duration(0.1).sleep();
+                    ROS_INFO_THROTTLE(1.0, "Waiting for subscribers on %s", topic.c_str());
+                }
+
+                if (joint_publishers_[joint_name].getNumSubscribers() == 0)
+                {
+                    ROS_WARN("No subscribers for %s after timeout", topic.c_str());
+                }
+                else
+                {
+                    ROS_INFO("Got subscribers for %s", topic.c_str());
                 }
             }
         }
@@ -60,16 +83,16 @@ namespace hexapod
         // Pobierz konfigurację dla danej nogi
         const auto &leg = leg_origins.at(leg_number);
 
-        // Dodajemy debugowanie
         ROS_DEBUG("Leg %d IK input - x: %.2f, y: %.2f, z: %.2f", leg_number, x, y, z);
 
-        // 1) Przesuń współrzędne względem biodra danej nogi
+        // 1. Przekształcenie do lokalnego układu współrzędnych nogi
         double local_x = x - leg.x;
         double local_y = y - leg.y;
 
-        // 2) Obrót biodra wokół Z
+        // 2. Obliczenie kąta biodra (obrót wokół osi Z)
         q1 = std::atan2(local_y, local_x);
 
+        // Inwersja kąta biodra dla prawych nóg
         if (leg.invert_hip)
         {
             if (q1 > 0)
@@ -78,11 +101,11 @@ namespace hexapod
                 q1 = q1 + M_PI;
         }
 
-        // 3) Dystans promieniowy od osi biodra minus przesunięcie L1
+        // 3. Obliczenie odległości radialnej od osi biodra
         double r = std::sqrt(local_x * local_x + local_y * local_y) - L1;
-        double h = -z;
+        double h = -z; // Zmiana znaku, bo oś Z jest skierowana w dół
 
-        // Dodajemy debugowanie zasięgu
+        // 4. Sprawdzenie czy punkt jest w zasięgu nogi
         double D2 = r * r + h * h;
         double D = std::sqrt(D2);
 
@@ -93,8 +116,24 @@ namespace hexapod
             return false;
         }
 
-        // Reszta kodu bez zmian...
+        // 5. Obliczenie kąta kolana (q2)
+        double cos_q2 = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3);
+        cos_q2 = std::max(-1.0, std::min(1.0, cos_q2));
+
+        q2 = -std::acos(cos_q2); // Podstawowe odwrócenie dla wszystkich nóg
+
+        // 6. Obliczenie kąta kostki (q3)
+        double beta = std::atan2(h, r);
+        double alpha = std::atan2(L3 * std::sin(q2), L2 + L3 * std::cos(q2));
+
+        q3 = -(beta - alpha);
+
+        ROS_DEBUG("Leg %d (type: %s) IK result:", leg_number,
+                  leg.invert_knee ? "right" : "left");
+        ROS_DEBUG("  q1 (hip): %.2f°", q1 * 180.0 / M_PI);
+        ROS_DEBUG("  q2 (knee): %.2f°", q2 * 180.0 / M_PI);
+        ROS_DEBUG("  q3 (ankle): %.2f°", q3 * 180.0 / M_PI);
+
         return true;
     }
-
 } // namespace hexapod

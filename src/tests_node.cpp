@@ -14,12 +14,13 @@ int main(int argc, char **argv)
 
         ROS_INFO("Initializing OneLegGait...");
         one_leg_gait.initialize();
+        ros::Duration(1.0).sleep(); // Daj czas na ustabilizowanie połączeń
 
-        // Ustawiamy bezpieczniejsze parametry
-        one_leg_gait.setStepSize(3.0, 2.0); // Mniejsza długość i wysokość kroku
-        one_leg_gait.setSpeed(2.0);         // Wolniejszy ruch
+        // Ustawiamy bardzo bezpieczne parametry
+        one_leg_gait.setStepSize(2.0, 1.5); // Minimalne ruchy
+        one_leg_gait.setSpeed(2.5);         // Bardzo wolny ruch
 
-        ROS_INFO("Executing OneLegGait test...");
+        ROS_INFO("Starting execution...");
         if (one_leg_gait.execute())
         {
             ROS_INFO("Test completed successfully");
@@ -27,6 +28,7 @@ int main(int argc, char **argv)
         else
         {
             ROS_ERROR("Test failed");
+            return 1;
         }
 
         one_leg_gait.stop();
