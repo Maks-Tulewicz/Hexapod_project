@@ -10,17 +10,15 @@ int main(int argc, char **argv)
 
     try
     {
-        // Utworzenie instancji OneLegGait
         hexapod::OneLegGait one_leg_gait(nh);
 
-        // Inicjalizacja
         ROS_INFO("Initializing OneLegGait...");
         one_leg_gait.initialize();
 
-        // Konfiguracja parametrów
-        one_leg_gait.setStepParameters(2.0, 4.0, 1.0);
+        // Ustawiamy bezpieczniejsze parametry
+        one_leg_gait.setStepSize(3.0, 2.0); // Mniejsza długość i wysokość kroku
+        one_leg_gait.setSpeed(2.0);         // Wolniejszy ruch
 
-        // Wykonanie testu
         ROS_INFO("Executing OneLegGait test...");
         if (one_leg_gait.execute())
         {
@@ -31,7 +29,6 @@ int main(int argc, char **argv)
             ROS_ERROR("Test failed");
         }
 
-        // Zatrzymanie
         one_leg_gait.stop();
     }
     catch (const std::exception &e)

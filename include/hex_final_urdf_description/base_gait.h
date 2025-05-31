@@ -3,11 +3,19 @@
 
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
-#include <vector>
+#include <map>
 #include <string>
 
 namespace hexapod
 {
+
+    struct LegOrigin
+    {
+        double x;
+        double y;
+        bool invert_hip;
+        bool invert_knee;
+    };
 
     class BaseGait
     {
@@ -16,25 +24,26 @@ namespace hexapod
         std::map<std::string, ros::Publisher> joint_publishers_;
 
         // Parametry geometryczne nóg
-        const double L1 = 6.5;  // Długość pierwszego segmentu
-        const double L2 = 10.5; // Długość drugiego segmentu
-        const double L3 = 20.5; // Długość trzeciego segmentu
+        static constexpr double L1 = 6.5;  // hip → knee
+        static constexpr double L2 = 10.5; // knee → ankle
+        static constexpr double L3 = 20.5; // ankle → stopa
+
+        // Pozycje bioder względem centrum robota (na podstawie URDF)
+        static const std::map<int, LegOrigin> leg_origins;
 
     public:
-        explicit BaseGait(ros::NodeHandle &nh) : nh_(nh) {}
+        explicit BaseGait(ros::NodeHandle &nh);
         virtual ~BaseGait() = default;
 
-        // Metody wirtualne do implementacji w klasach pochodnych
-        virtual void initialize() = 0; // Inicjalizacja gaitu
-        virtual bool execute() = 0;    // Wykonanie kroku
-        virtual void stop() = 0;       // Zatrzymanie ruchu
+        virtual void initialize() = 0;
+        virtual bool execute() = 0;
+        virtual void stop() = 0;
 
     protected:
-        // Metody pomocnicze
         void initializePublishers();
         bool setJointPosition(const std::string &joint_name, double position);
-        bool calculateInverseKinematics(double x, double y, double z,
-                                        double &hip_angle, double &knee_angle, double &ankle_angle);
+        bool computeLegIK(int leg_number, double x, double y, double z,
+                          double &hip_angle, double &knee_angle, double &ankle_angle);
     };
 
 } // namespace hexapod

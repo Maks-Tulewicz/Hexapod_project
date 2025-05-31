@@ -6,16 +6,20 @@
 namespace hexapod
 {
 
+    struct GaitParams
+    {
+        double step_length;     // długość kroku
+        double step_height;     // wysokość podnoszenia nogi
+        double cycle_time;      // czas jednego cyklu ruchu nogi
+        double body_shift;      // przesunięcie ciała podczas przenoszenia nogi
+        double standing_height; // wysokość podczas stania
+    };
+
     class OneLegGait : public BaseGait
     {
     private:
-        // Parametry chodu
-        double step_height_ = 2.0; // Wysokość podnoszenia nogi
-        double step_length_ = 4.0; // Długość kroku
-        double cycle_time_ = 1.0;  // Czas cyklu dla jednej nogi
-
-        // Sekwencja nóg (numeracja od 1 do 6)
-        std::vector<int> leg_sequence_ = {1, 4, 5, 2, 3, 6};
+        GaitParams params_;
+        std::vector<int> leg_sequence_;
 
     public:
         explicit OneLegGait(ros::NodeHandle &nh);
@@ -24,12 +28,13 @@ namespace hexapod
         bool execute() override;
         void stop() override;
 
-        // Metody konfiguracyjne
-        void setStepParameters(double height, double length, double time);
+        void setStepSize(double length, double height);
+        void setSpeed(double cycle_time);
 
     private:
+        bool standUp();
+        void performStepCycle();
         bool moveLeg(int leg_number, double x, double y, double z);
-        void performSingleStep(int leg_number);
     };
 
 } // namespace hexapod
