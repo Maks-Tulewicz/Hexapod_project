@@ -50,113 +50,60 @@ namespace hexapod
         if (!isStanding())
             return;
 
-        const int MAIN_STEPS = 150;
-        const double dt = 0.02;
+        // Stałe parametry chodu
+        const int STEPS = 210;
+        const double dt = 0.007;
 
+        // Pozycje bazowe dla każdej nogi
         const std::map<int, std::vector<double>> base_positions = {
-            {1, {18.0, -15.0, -24.0}},
-            {2, {-18.0, -15.0, -24.0}},
-            {3, {22.0, 0.0, -24.0}},
-            {4, {-22.0, 0.0, -24.0}},
-            {5, {18.0, 15.0, -24.0}},
-            {6, {-18.0, 15.0, -24.0}}};
+            {1, {18.0, -15.0, -24.0}},  // Prawa przednia
+            {2, {-18.0, -15.0, -24.0}}, // Prawa tylna
+            {3, {22.0, 0.0, -24.0}},    // Prawa środkowa
+            {4, {-22.0, 0.0, -24.0}},   // Lewa środkowa
+            {5, {18.0, 15.0, -24.0}},   // Lewa przednia
+            {6, {-18.0, 15.0, -24.0}}   // Lewa tylna
+        };
 
-        const std::vector<int> leg_sequence = {1, 4, 5, 2, 3, 6};
+        // Sekwencja nóg jak w oryginalnym kodzie
+        const std::vector<int> leg_sequence = {1, 6, 2, 5, 3, 4};
 
         for (int leg : leg_sequence)
         {
+            ROS_INFO("Ruch nogi %d", leg);
             const auto &base_pos = base_positions.at(leg);
 
-            // Określamy czy to noga zewnętrzna
-            bool is_outer_leg = (leg == 1 || leg == 2 || leg == 5 || leg == 6);
+            // Parametry ruchu
+            double step_length = params_.step_length;
+            double step_height = params_.step_height;
 
-            for (int step = 0; step <= MAIN_STEPS; ++step)
+            for (int step = 0; step <= STEPS; ++step)
             {
-                double phase = static_cast<double>(step) / MAIN_STEPS;
-
-                auto smoothstep = [](double x) -> double
-                {
-                    if (x <= 0.0)
-                        return 0.0;
-                    if (x >= 1.0)
-                        return 1.0;
-                    return x * x * (3 - 2 * x);
-                };
+                double phase = static_cast<double>(step) / STEPS;
 
                 double x = base_pos[0];
                 double y = base_pos[1];
                 double z = base_pos[2];
 
-                double step_length = params_.step_length;
-                if (cmd_vel.linear.x != 0.0)
+                if (phase <= 0.5)
                 {
-                    step_length *= cmd_vel.linear.x > 0 ? -1.0 : 1.0;
-                }
+                    // Faza przenoszenia
+                    double swing_phase = phase * 2.0;
 
-                const double MAX_HEIGHT = params_.step_height * 0.75;
+                    // Ruch do przodu z funkcją cosinus dla płynności
+                    double forward_motion = (1.0 - std::cos(M_PI * swing_phase));
+                    y = base_pos[1] - step_length * forward_motion * (cmd_vel.linear.x > 0 ? 1.0 : -1.0);
 
-                if (phase < 0.5)
-                { // Faza podnoszenia i ruchu do przodu
-                    double lift_phase = smoothstep(phase * 2.0);
-
-                    // Dodajemy komponent obrotu dla nóg zewnętrznych
-                    if (is_outer_leg)
-                    {
-                        // Zwiększamy zakres ruchu w osi Y dla nóg zewnętrznych
-                        double y_offset = step_length * 1.2; // Zwiększamy zakres ruchu
-                        y = base_pos[1] - y_offset * lift_phase;
-
-                        // Dodajemy ruch w osi X aby wymusić obrót w biodrze
-                        double x_amplitude = 2.0; // Amplituda ruchu w osi X
-                        x = base_pos[0] + x_amplitude * std::sin(lift_phase * M_PI);
-                    }
-                    else
-                    {
-                        y = base_pos[1] - step_length * lift_phase;
-                    }
-
-                    // Ruch w górę
-                    double height_factor = std::sin(lift_phase * M_PI_2);
-                    z = base_pos[2] - MAX_HEIGHT * height_factor;
+                    // Sinusoidalny ruch w górę i w dół
+                    z = base_pos[2] - step_height * std::sin(M_PI * swing_phase);
                 }
                 else
-                { // Faza opuszczania i powrotu
-                    double return_phase = smoothstep((phase - 0.5) * 2.0);
-
-                    if (is_outer_leg)
-                    {
-                        // Podobnie dla fazy powrotnej
-                        double y_offset = step_length * 1.2;
-                        y = base_pos[1] - y_offset * (1.0 - return_phase);
-
-                        // Płynny powrót w osi X
-                        double x_amplitude = 2.0;
-                        x = base_pos[0] + x_amplitude * std::sin((1.0 - return_phase) * M_PI);
-                    }
-                    else
-                    {
-                        y = base_pos[1] - step_length * (1.0 - return_phase);
-                    }
-
-                    // Opuszczanie
-                    double height_factor = std::cos(return_phase * M_PI_2);
-                    z = base_pos[2] - MAX_HEIGHT * height_factor * 0.5;
-                }
-
-                // Wygładzenie końcowego ruchu
-                if (phase > 0.85)
                 {
-                    double end_phase = smoothstep((phase - 0.85) / 0.15);
-                    y = y * (1.0 - end_phase) + base_pos[1] * end_phase;
-                    if (is_outer_leg)
-                    {
-                        x = x * (1.0 - end_phase) + base_pos[0] * end_phase;
-                    }
+                    // Faza podporowa - powrót do pozycji początkowej
+                    double support_phase = (phase - 0.5) * 2.0;
+                    double y_offset = step_length * (cmd_vel.linear.x > 0 ? 1.0 : -1.0);
+                    y = (base_pos[1] - y_offset) + y_offset * support_phase;
+                    z = base_pos[2];
                 }
-
-                // Ograniczenie maksymalnych zmian wysokości
-                z = std::max(z, base_pos[2] - MAX_HEIGHT);
-                z = std::min(z, base_pos[2] + MAX_HEIGHT * 0.1);
 
                 // Obliczanie IK i ustawianie stawów
                 double q1, q2, q3;
@@ -166,7 +113,7 @@ namespace hexapod
 
                     if (step % 20 == 0)
                     {
-                        ROS_INFO("Noga %d, Krok %d/%d:", leg, step, MAIN_STEPS);
+                        ROS_INFO("Noga %d, Krok %d/%d:", leg, step, STEPS);
                         ROS_INFO("  Pozycja: x=%.3f, y=%.3f, z=%.3f", x, y, z);
                         ROS_INFO("  Faza: %.2f", phase);
                         ROS_INFO("  Kąty [deg]: hip=%.1f, knee=%.1f, ankle=%.1f",
@@ -177,7 +124,8 @@ namespace hexapod
                 ros::Duration(dt).sleep();
             }
 
-            ros::Duration(0.02).sleep();
+            // Krótka pauza między ruchami nóg
+            ros::Duration(0.1).sleep();
         }
     }
 
