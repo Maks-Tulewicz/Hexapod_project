@@ -4,6 +4,8 @@
 #include "hex_final_urdf_description/base_gait.h"
 #include <geometry_msgs/Twist.h>
 #include <deque>
+#include <map>
+#include <vector>
 
 namespace hexapod
 {
