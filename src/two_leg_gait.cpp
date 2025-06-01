@@ -1,13 +1,47 @@
 #include "hex_final_urdf_description/two_leg_gait.h"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace hexapod
 {
     TwoLegGait::TwoLegGait(ros::NodeHandle &nh)
-        : BaseGait(nh)
+        : BaseGait(nh), is_initialized_(false), is_executing_(false)
     {
         updateParameters(nh);
+    }
+
+    void TwoLegGait::initialize()
+    {
+        initializePublishers();
+        ROS_INFO("Two Leg Gait initialized");
+        is_initialized_ = true;
+    }
+
+    bool TwoLegGait::execute()
+    {
+        standUp(); // Ustaw robota w pozycji stojącej
+
+        if (!is_standing_)
+        {
+            ROS_WARN("Robot must be standing before walking");
+            return false;
+        }
+
+        is_executing_ = true;
+        // Wykonaj ruch do przodu z domyślną prędkością
+        geometry_msgs::Twist cmd_vel;
+        cmd_vel.linear.x = 0.5;  // Prędkość do przodu
+        cmd_vel.angular.z = 0.0; // Brak obrotu
+
+        walkForward(cmd_vel, 10); // Wykonaj 10 kroków
+        return true;
+    }
+
+    void TwoLegGait::stop()
+    {
+        is_executing_ = false;
+        ROS_INFO("Stopping Two Leg Gait");
     }
 
     void TwoLegGait::updateParameters(const ros::NodeHandle &nh)
@@ -18,9 +52,21 @@ namespace hexapod
         params_.standing_height = -24.0; // Standardowa wysokość
     }
 
+    void TwoLegGait::walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps)
+    {
+        if (!is_initialized_ || !is_executing_)
+            return;
+
+        for (int i = 0; i < num_steps && is_executing_; ++i)
+        {
+            makeStep(cmd_vel);
+            ros::Duration(params_.cycle_time / 6.0).sleep();
+        }
+    }
+
     void TwoLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
     {
-        if (!isStanding())
+        if (!isStanding() || !is_initialized_ || !is_executing_)
             return;
 
         const int STEPS = 210;
@@ -38,23 +84,85 @@ namespace hexapod
 
         // Pary nóg do równoczesnego ruchu
         const std::vector<std::pair<int, int>> leg_pairs = {
-            {1, 6}, // Lewa przednia i prawa tylna
+            {1, 4}, // Lewa przednia i prawa środkowa
             {2, 5}, // Prawa przednia i lewa tylna
-            {3, 4}  // Lewa środkowa i prawa środkowa
+            {3, 6}  // Lewa środkowa i prawa tylna
         };
 
-        double movement_direction = cmd_vel.linear.x > 0 ? -1.0 : 1.0;
+        double movement_direction = cmd_vel.linear.x > 0 ? 1.0 : -1.0;
 
         for (const auto &pair : leg_pairs)
         {
-            ROS_INFO("Przenoszenie pary nóg %d i %d", pair.first, pair.second);
+            ROS_INFO("Moving legs %d and %d", pair.first, pair.second);
+            const auto &pos1 = base_positions.at(pair.first);
+            const auto &pos2 = base_positions.at(pair.second);
 
-            moveLegPair(pair.first, pair.second,
-                        base_positions.at(pair.first),
-                        base_positions.at(pair.second),
-                        movement_direction);
+            // Faza uniesienia i przeniesienia nóg
+            for (int step = 0; step < STEPS / 2 && is_executing_; ++step)
+            {
+                double phase = static_cast<double>(step) / (STEPS / 2);
 
-            ros::Duration(0.3).sleep();
+                // Ruch do przodu i w górę
+                double x_offset = params_.step_length * phase * movement_direction;
+                double z_offset = params_.step_height * std::sin(M_PI * phase);
+
+                // Dla pierwszej nogi w parze
+                double q1_1, q2_1, q3_1;
+                if (computeLegIK(pair.first,
+                                 pos1[0] + x_offset,
+                                 pos1[1],
+                                 pos1[2] + z_offset,
+                                 q1_1, q2_1, q3_1))
+                {
+                    setLegJoints(pair.first, q1_1, q2_1, q3_1);
+                }
+
+                // Dla drugiej nogi w parze
+                double q1_2, q2_2, q3_2;
+                if (computeLegIK(pair.second,
+                                 pos2[0] + x_offset,
+                                 pos2[1],
+                                 pos2[2] + z_offset,
+                                 q1_2, q2_2, q3_2))
+                {
+                    setLegJoints(pair.second, q1_2, q2_2, q3_2);
+                }
+
+                ros::Duration(dt).sleep();
+            }
+
+            // Faza opuszczania nóg
+            for (int step = 0; step < STEPS / 2 && is_executing_; ++step)
+            {
+                double phase = static_cast<double>(step) / (STEPS / 2);
+
+                // Tylko ruch w dół
+                double z_offset = params_.step_height * (1.0 - std::sin(M_PI * phase));
+
+                // Dla pierwszej nogi w parze
+                double q1_1, q2_1, q3_1;
+                if (computeLegIK(pair.first,
+                                 pos1[0] + params_.step_length * movement_direction,
+                                 pos1[1],
+                                 pos1[2] + z_offset,
+                                 q1_1, q2_1, q3_1))
+                {
+                    setLegJoints(pair.first, q1_1, q2_1, q3_1);
+                }
+
+                // Dla drugiej nogi w parze
+                double q1_2, q2_2, q3_2;
+                if (computeLegIK(pair.second,
+                                 pos2[0] + params_.step_length * movement_direction,
+                                 pos2[1],
+                                 pos2[2] + z_offset,
+                                 q1_2, q2_2, q3_2))
+                {
+                    setLegJoints(pair.second, q1_2, q2_2, q3_2);
+                }
+
+                ros::Duration(dt).sleep();
+            }
         }
     }
 
@@ -66,119 +174,63 @@ namespace hexapod
         const int STEPS = 210;
         const double dt = 0.008;
 
-        // Bufory dla wygładzania ruchu
-        std::deque<double> y_buffer1(5, start_pos1[1]);
-        std::deque<double> y_buffer2(5, start_pos2[1]);
-
-        double last_y1 = start_pos1[1];
-        double last_y2 = start_pos2[1];
-
-        for (int step = 0; step <= STEPS; ++step)
+        for (int step = 0; step < STEPS && is_executing_; ++step)
         {
             double phase = static_cast<double>(step) / STEPS;
-
-            // Pozycje dla obu nóg
-            std::vector<double> pos1 = start_pos1;
-            std::vector<double> pos2 = start_pos2;
 
             if (phase <= 0.5)
             {
                 // Faza przenoszenia
                 double swing_phase = phase * 2.0;
-                double motion = std::sin(M_PI * swing_phase / 2.0);
-                motion = motion * motion; // Kwadrat sinusa dla płynniejszego ruchu
 
-                // Obliczenie pozycji Y dla obu nóg
-                double y_offset = params_.step_length * movement_direction * motion;
-                pos1[1] = start_pos1[1] + y_offset;
-                pos2[1] = start_pos2[1] + y_offset;
+                // Pierwsza noga
+                double y1 = start_pos1[1] - params_.step_length * (1.0 - std::cos(M_PI * swing_phase)) * movement_direction;
+                double z1 = start_pos1[2] - params_.step_height * std::sin(M_PI * swing_phase);
 
-                // Ruch w górę i w dół
-                double height_factor = 4.0 * swing_phase * (1.0 - swing_phase);
-                pos1[2] = start_pos1[2] - params_.step_height * height_factor;
-                pos2[2] = start_pos2[2] - params_.step_height * height_factor;
+                // Druga noga - ten sam ruch
+                double y2 = start_pos2[1] - params_.step_length * (1.0 - std::cos(M_PI * swing_phase)) * movement_direction;
+                double z2 = start_pos2[2] - params_.step_height * std::sin(M_PI * swing_phase);
+
+                // Obliczanie kątów dla nóg przy użyciu kinematyki odwrotnej
+                double q1_1, q2_1, q3_1, q1_2, q2_2, q3_2;
+
+                if (computeLegIK(leg1, start_pos1[0], y1, z1, q1_1, q2_1, q3_1))
+                {
+                    setLegJoints(leg1, q1_1, q2_1, q3_1);
+                }
+
+                if (computeLegIK(leg2, start_pos2[0], y2, z2, q1_2, q2_2, q3_2))
+                {
+                    setLegJoints(leg2, q1_2, q2_2, q3_2);
+                }
             }
             else
             {
-                // Faza podporowa
+                // Faza podporowa - powrót do pozycji początkowej
                 double support_phase = (phase - 0.5) * 2.0;
-                double motion = std::cos(M_PI * support_phase / 2.0);
-                motion = motion * motion;
 
-                double y_offset = params_.step_length * movement_direction * (1.0 - motion);
-                pos1[1] = start_pos1[1] + y_offset;
-                pos2[1] = start_pos2[1] + y_offset;
+                // Pierwsza noga
+                double y1 = (start_pos1[1] - params_.step_length * movement_direction) +
+                            params_.step_length * support_phase * movement_direction;
 
-                pos1[2] = start_pos1[2];
-                pos2[2] = start_pos2[2];
-            }
+                // Druga noga
+                double y2 = (start_pos2[1] - params_.step_length * movement_direction) +
+                            params_.step_length * support_phase * movement_direction;
 
-            // Wygładzanie ruchu
-            y_buffer1.pop_front();
-            y_buffer1.push_back(pos1[1]);
-            y_buffer2.pop_front();
-            y_buffer2.push_back(pos2[1]);
+                double q1_1, q2_1, q3_1, q1_2, q2_2, q3_2;
 
-            double smooth_y1 = 0.0, smooth_y2 = 0.0;
-            for (double y : y_buffer1)
-                smooth_y1 += y;
-            for (double y : y_buffer2)
-                smooth_y2 += y;
-            pos1[1] = smooth_y1 / y_buffer1.size();
-            pos2[1] = smooth_y2 / y_buffer2.size();
+                if (computeLegIK(leg1, start_pos1[0], y1, start_pos1[2], q1_1, q2_1, q3_1))
+                {
+                    setLegJoints(leg1, q1_1, q2_1, q3_1);
+                }
 
-            // Ograniczenie prędkości zmian
-            double max_step_change = 0.3;
-            pos1[1] = last_y1 + std::clamp(pos1[1] - last_y1, -max_step_change, max_step_change);
-            pos2[1] = last_y2 + std::clamp(pos2[1] - last_y2, -max_step_change, max_step_change);
-            last_y1 = pos1[1];
-            last_y2 = pos2[1];
-
-            // Zastosowanie kinematyki odwrotnej i ustawienie stawów
-            double q1, q2, q3;
-            if (computeLegIK(leg1, pos1[0], pos1[1], pos1[2], q1, q2, q3))
-            {
-                setLegJoints(leg1, q1, q2, q3);
-            }
-            if (computeLegIK(leg2, pos2[0], pos2[1], pos2[2], q1, q2, q3))
-            {
-                setLegJoints(leg2, q1, q2, q3);
+                if (computeLegIK(leg2, start_pos2[0], y2, start_pos2[2], q1_2, q2_2, q3_2))
+                {
+                    setLegJoints(leg2, q1_2, q2_2, q3_2);
+                }
             }
 
             ros::Duration(dt).sleep();
-            ros::spinOnce();
         }
     }
-    void TwoLegGait::initialize()
-    {
-
-        initializePublishers();
-        ROS_INFO("One leg gait initialized");
-    }
-
-    bool TwoLegGait::execute()
-    {
-
-        standUp(); // Ustaw robota w pozycji stojącej
-
-        if (!is_standing_)
-        {
-            ROS_WARN("Robot must be standing before walking");
-            return false;
-        }
-        else
-        {
-            // Wykonaj ruch do przodu z domyślną prędkością
-            geometry_msgs::Twist cmd_vel;
-            cmd_vel.linear.x = 0.5;  // Prędkość do przodu
-            cmd_vel.angular.z = 0.0; // Brak obrotu
-
-            moveLegPair(1, 6, {18.0, -15.0, -24.0}, {-18.0, 15.0, -24.0}, cmd_vel.linear.x > 0 ? -1.0 : 1.0);
-            moveLegPair(2, 5, {-18.0, -15.0, -24.0}, {18.0, 15.0, -24.0}, cmd_vel.linear.x > 0 ? -1.0 : 1.0);
-            moveLegPair(3, 4, {22.0, 0.0, -24.0}, {-22.0, 0.0, -24.0}, cmd_vel.linear.x > 0 ? -1.0 : 1.0);
-        }
-        return true;
-    }
-    void TwoLegGait::stop() { /* Możesz dodać własną logikę zatrzymania lub zostawić pustą */ }
-
 } // namespace hexapod

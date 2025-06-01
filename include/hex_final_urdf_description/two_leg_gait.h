@@ -10,17 +10,16 @@
 
 namespace hexapod
 {
-
     class TwoLegGait : public BaseGait
     {
     public:
-        explicit TwoLegGait(ros::NodeHandle &nh); // <- poprawka tutaj
+        explicit TwoLegGait(ros::NodeHandle &nh);
         virtual ~TwoLegGait() = default;
 
-        void makeStep(const geometry_msgs::Twist &cmd_vel);
         void initialize() override;
         bool execute() override;
         void stop() override;
+        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps = 1);
 
     private:
         struct Parameters
@@ -31,13 +30,15 @@ namespace hexapod
             double standing_height;
         } params_;
 
+        void makeStep(const geometry_msgs::Twist &cmd_vel);
         void moveLegPair(int leg1, int leg2,
                          const std::vector<double> &start_pos1,
                          const std::vector<double> &start_pos2,
                          double movement_direction);
 
-        bool initializeGait();
         void updateParameters(const ros::NodeHandle &nh);
+        bool is_initialized_;
+        bool is_executing_;
     };
 
 } // namespace hexapod
