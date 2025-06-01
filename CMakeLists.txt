@@ -68,8 +68,10 @@ endforeach()
 # Komentujemy nową implementację do czasu utworzenia plików
  add_library(${PROJECT_NAME}
    src/base_gait.cpp
-   src/one_leg_gait.cpp
- )
+   src/one_leg_gait.cpp 
+   src/two_leg_gait.cpp
+
+   )
 
  target_link_libraries(${PROJECT_NAME}
    ${catkin_LIBRARIES}
