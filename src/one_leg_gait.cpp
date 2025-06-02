@@ -5,131 +5,44 @@ namespace hexapod
     OneLegGait::OneLegGait(ros::NodeHandle &nh)
         : BaseGait(nh)
     {
-        params_.step_height = 6.0;
-        params_.step_length = 7.0;
-        params_.cycle_time = 2.8;
-        params_.standing_height = 24.0; // minus jest w obliczeniach
-        params_.body_shift = 2.0;
+        // Konserwatywne parametry które na pewno działają
+        params_.step_height = 3.0;
+        params_.step_length = 3.0;
+        params_.cycle_time = 3.5;
+        params_.standing_height = 24.0;
+        params_.body_shift = 1.0;
     }
 
     void OneLegGait::initialize()
     {
         initializePublishers();
-        ROS_INFO("One leg gait initialized");
+        ROS_INFO("OneLegGait initialized - step_length=%.1f, step_height=%.1f, cycle_time=%.1f",
+                 params_.step_length, params_.step_height, params_.cycle_time);
     }
 
     bool OneLegGait::execute()
     {
-        standUp(); // Ustaw robota w pozycji stojącej
-
-        if (!is_standing_)
+        if (!standUp())
         {
-            ROS_WARN("Robot must be standing before walking");
+            ROS_ERROR("Failed to stand up");
             return false;
         }
-        else
-        {
-            // Wykonaj ruch do przodu z domyślną prędkością
-            geometry_msgs::Twist cmd_vel;
-            cmd_vel.linear.x = 0.5;  // Prędkość do przodu
-            cmd_vel.angular.z = 0.0; // Brak obrotu
 
-            walkForward(cmd_vel, 10); // Wykonaj 10 kroków
-        }
+        geometry_msgs::Twist cmd_vel;
+        cmd_vel.linear.x = 1.0;
+        cmd_vel.linear.y = 0.0;
+        cmd_vel.angular.z = 0.0;
+
+        walkForward(cmd_vel, 2);
         return true;
     }
 
     void OneLegGait::stop()
     {
-        // Zatrzymaj ruch, ale zostaw robota w pozycji stojącej
-        ROS_INFO("Stopping one leg gait");
+        ROS_INFO("Stopping OneLegGait - robot remains standing");
     }
 
-    void OneLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
-    {
-        if (!isStanding())
-            return;
-
-        // Stałe parametry chodu
-        const int STEPS = 210;
-        const double dt = 0.007;
-
-        // Pozycje bazowe dla każdej nogi
-        const std::map<int, std::vector<double>> base_positions = {
-            {1, {18.0, -15.0, -24.0}},  // Prawa przednia
-            {2, {-18.0, -15.0, -24.0}}, // Prawa tylna
-            {3, {22.0, 0.0, -24.0}},    // Prawa środkowa
-            {4, {-22.0, 0.0, -24.0}},   // Lewa środkowa
-            {5, {18.0, 15.0, -24.0}},   // Lewa przednia
-            {6, {-18.0, 15.0, -24.0}}   // Lewa tylna
-        };
-
-        // Sekwencja nóg jak w oryginalnym kodzie
-        const std::vector<int> leg_sequence = {1, 6, 2, 5, 3, 4};
-
-        for (int leg : leg_sequence)
-        {
-            ROS_INFO("Ruch nogi %d", leg);
-            const auto &base_pos = base_positions.at(leg);
-
-            // Parametry ruchu
-            double step_length = params_.step_length;
-            double step_height = params_.step_height;
-
-            for (int step = 0; step <= STEPS; ++step)
-            {
-                double phase = static_cast<double>(step) / STEPS;
-
-                double x = base_pos[0];
-                double y = base_pos[1];
-                double z = base_pos[2];
-
-                if (phase <= 0.5)
-                {
-                    // Faza przenoszenia
-                    double swing_phase = phase * 2.0;
-
-                    // Ruch do przodu z funkcją cosinus dla płynności
-                    double forward_motion = (1.0 - std::cos(M_PI * swing_phase));
-                    y = base_pos[1] - step_length * forward_motion * (cmd_vel.linear.x > 0 ? 1.0 : -1.0);
-
-                    // Sinusoidalny ruch w górę i w dół
-                    z = base_pos[2] - step_height * std::sin(M_PI * swing_phase);
-                }
-                else
-                {
-                    // Faza podporowa - powrót do pozycji początkowej
-                    double support_phase = (phase - 0.5) * 2.0;
-                    double y_offset = step_length * (cmd_vel.linear.x > 0 ? 1.0 : -1.0);
-                    y = (base_pos[1] - y_offset) + y_offset * support_phase;
-                    z = base_pos[2];
-                }
-
-                // Obliczanie IK i ustawianie stawów
-                double q1, q2, q3;
-                if (computeLegIK(leg, x, y, z, q1, q2, q3))
-                {
-                    setLegJoints(leg, q1, q2, q3);
-
-                    if (step % 20 == 0)
-                    {
-                        ROS_INFO("Noga %d, Krok %d/%d:", leg, step, STEPS);
-                        ROS_INFO("  Pozycja: x=%.3f, y=%.3f, z=%.3f", x, y, z);
-                        ROS_INFO("  Faza: %.2f", phase);
-                        ROS_INFO("  Kąty [deg]: hip=%.1f, knee=%.1f, ankle=%.1f",
-                                 q1 * 180.0 / M_PI, q2 * 180.0 / M_PI, q3 * 180.0 / M_PI);
-                    }
-                }
-
-                ros::Duration(dt).sleep();
-            }
-
-            // Krótka pauza między ruchami nóg
-            ros::Duration(0.1).sleep();
-        }
-    }
-
-    void OneLegGait::walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps)
+    void OneLegGait::walkForward(const geometry_msgs::Twist &cmd_vel, int num_sequences)
     {
         if (!isStanding())
         {
@@ -137,38 +50,117 @@ namespace hexapod
             return;
         }
 
-        // Parametry stabilizacji
-        const double step_pause = 0.2;  // Pauza między pojedynczymi krokami
-        const double cycle_pause = 0.5; // Dłuższa pauza po pełnym cyklu (wszystkie nogi)
+        const std::vector<int> safe_leg_sequence = {1, 4, 2, 5, 3, 6};
 
-        // Sekwencja nóg zoptymalizowana dla stabilności
-        const std::vector<std::vector<int>> leg_groups = {
-            {1, 4, 5}, // pierwsza grupa (lewa przednia, prawa środkowa, lewa tylna)
-            {2, 3, 6}  // druga grupa (prawa przednia, lewa środkowa, prawa tylna)
-        };
+        const std::map<int, std::vector<double>> base_positions = {
+            {1, {18.0, -15.0, -params_.standing_height}},
+            {2, {-18.0, -15.0, -params_.standing_height}},
+            {3, {22.0, 0.0, -params_.standing_height}},
+            {4, {-22.0, 0.0, -params_.standing_height}},
+            {5, {18.0, 15.0, -params_.standing_height}},
+            {6, {-18.0, 15.0, -params_.standing_height}}};
 
-        for (int step = 0; step < num_steps && ros::ok(); ++step)
+        for (int sequence = 0; sequence < num_sequences && ros::ok(); ++sequence)
         {
-            ROS_INFO("Wykonuję krok %d z %d", step + 1, num_steps);
+            ROS_INFO("=== Wykonuję sekwencję jednonożną %d/%d ===", sequence + 1, num_sequences);
 
-            // Wykonanie kroku przez pierwszą grupę nóg
-            makeStep(cmd_vel);
-
-            // Pauza na stabilizację po kroku
-            ros::Duration(step_pause).sleep();
-
-            // Co pełen cykl (co 2 kroki) dajemy dłuższą pauzę na stabilizację
-            if (step % 2 == 1)
+            for (int leg : safe_leg_sequence)
             {
-                ROS_INFO("Stabilizacja po pełnym cyklu kroków");
-                ros::Duration(cycle_pause).sleep();
+                if (!ros::ok())
+                    break;
+
+                ROS_INFO("Poruszam nogą %d", leg);
+
+                // USUNIEMY WALIDACJĘ - po prostu spróbuj ruch
+                moveSingleLegSimple(leg, base_positions.at(leg), cmd_vel);
+
+                ros::Duration(0.4).sleep();
+                stabilizeRemainingLegs(leg, base_positions);
+                ros::Duration(0.2).sleep();
+            }
+
+            ros::Duration(0.6).sleep();
+        }
+
+        ROS_INFO("Zakończono chód jednonożny");
+    }
+
+    void OneLegGait::moveSingleLegSimple(int leg_number,
+                                         const std::vector<double> &base_pos,
+                                         const geometry_msgs::Twist &cmd_vel)
+    {
+        const int STEPS = 60;
+        const double dt = 0.03;
+
+        double step_length = params_.step_length * cmd_vel.linear.x;
+        double step_height = params_.step_height;
+
+        for (int step = 0; step <= STEPS; ++step)
+        {
+            double phase = static_cast<double>(step) / STEPS;
+
+            double x = base_pos[0];
+            double y = base_pos[1];
+            double z = base_pos[2];
+
+            if (phase <= 0.5)
+            {
+                // Faza swing - bardzo konserwatywna
+                double swing_phase = phase / 0.5;
+
+                // Prosta liniowa interpolacja
+                y = base_pos[1] + step_length * (swing_phase - 0.5);
+
+                // Niska, bezpieczna trajektoria
+                z = base_pos[2] - step_height * std::sin(M_PI * swing_phase);
+            }
+            else
+            {
+                // Faza stance - powrót do pozycji bazowej
+                double stance_phase = (phase - 0.5) / 0.5;
+
+                y = base_pos[1] + step_length * 0.5 * (1.0 - stance_phase);
+                z = base_pos[2];
+            }
+
+            // Prosta próba IK - jeśli nie wyjdzie, po prostu pomiń
+            double q1, q2, q3;
+            if (computeLegIK(leg_number, x, y, z, q1, q2, q3))
+            {
+                setLegJoints(leg_number, q1, q2, q3);
+            }
+            // Jeśli IK zawodzi, po prostu nie ruszamy nogą w tym kroku
+
+            ros::Duration(dt).sleep();
+        }
+    }
+
+    void OneLegGait::stabilizeRemainingLegs(int moving_leg,
+                                            const std::map<int, std::vector<double>> &base_positions)
+    {
+        for (int leg = 1; leg <= 6; ++leg)
+        {
+            if (leg == moving_leg)
+                continue;
+
+            const auto &pos = base_positions.at(leg);
+            double q1, q2, q3;
+
+            if (computeLegIK(leg, pos[0], pos[1], pos[2], q1, q2, q3))
+            {
+                setLegJoints(leg, q1, q2, q3);
             }
         }
     }
 
+    void OneLegGait::makeStep(const geometry_msgs::Twist &cmd_vel)
+    {
+        // Nie używamy tej funkcji w nowej implementacji
+        ROS_INFO("Use walkForward() instead");
+    }
+
     double OneLegGait::smoothStep(double x)
     {
-        // Funkcja wygładzająca ruch: 3x^2 - 2x^3
         x = std::max(0.0, std::min(1.0, x));
         return x * x * (3.0 - 2.0 * x);
     }

@@ -39,12 +39,24 @@ namespace hexapod
         bool is_initialized_;
         bool is_executing_;
 
+        // Mapowanie pozycji bazowych (używane lokalnie)
+        std::map<int, LegPosition> base_positions;
+
         void updateParameters(const ros::NodeHandle &nh);
         void makeStep(const geometry_msgs::Twist &cmd_vel);
-        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps);
+        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_cycles);
+
+        // Metoda dla ruchu pary nóg
         void moveLegPair(int leg1, int leg2,
-                         const LegPosition &start_pos1,
-                         const LegPosition &start_pos2);
+                         const LegPosition &base_pos1,
+                         const LegPosition &base_pos2,
+                         const geometry_msgs::Twist &cmd_vel);
+
+        // DODANE: Brakująca deklaracja stabilizeOtherLegs
+        void stabilizeOtherLegs(int moving_leg1, int moving_leg2);
+
+        // Funkcja wygładzająca ruch
+        double smoothStep(double x);
     };
 
 } // namespace hexapod

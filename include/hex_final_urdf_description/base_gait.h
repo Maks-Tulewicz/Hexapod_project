@@ -46,12 +46,18 @@ namespace hexapod
         bool isStanding() const { return is_standing_; }
         bool standUp();
 
-    protected:
-        void initializePublishers();
-        bool setJointPosition(const std::string &joint_name, double position);
+        // Nowe funkcje diagnostyczne
+        bool debugLegIK(int leg_number, double x, double y, double z);
+        void testAllBasePositions();
+
+        // Public wrappers dla testowania
         bool computeLegIK(int leg_number, double x, double y, double z,
                           double &q1, double &q2, double &q3);
         void setLegJoints(int leg_number, double q1, double q2, double q3);
+
+    protected:
+        void initializePublishers();
+        bool setJointPosition(const std::string &joint_name, double position);
 
     private:
         void standUpCallback(const std_msgs::Empty::ConstPtr &msg);

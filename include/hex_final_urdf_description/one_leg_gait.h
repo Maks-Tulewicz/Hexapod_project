@@ -29,10 +29,18 @@ namespace hexapod
         void stop() override;
 
         void setParameters(const WalkingParameters &params) { params_ = params; }
-        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_steps = 1);
+        void walkForward(const geometry_msgs::Twist &cmd_vel, int num_sequences = 1);
 
     private:
         void makeStep(const geometry_msgs::Twist &cmd_vel);
+
+        // Uproszczone funkcje bez walidacji
+        void moveSingleLegSimple(int leg_number,
+                                 const std::vector<double> &base_pos,
+                                 const geometry_msgs::Twist &cmd_vel);
+        void stabilizeRemainingLegs(int moving_leg,
+                                    const std::map<int, std::vector<double>> &base_positions);
+
         double smoothStep(double x);
     };
 
